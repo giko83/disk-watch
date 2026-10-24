@@ -7,6 +7,8 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 - **Telegram** Bot API or **local sendmail** transport (e.g. Proxmox Notifications).
 - Uses a persistent journal cursor so old errors are not repeatedly announced.
 
+**SMART/USB standby:** see [the non-waking troubleshooting guide](docs/smart-usb-standby.md) before enabling SMART polling on disks that should sleep.
+
 **Initial public release:** based on a working homelab deployment. Not yet security-audited or broadly tested. This does not replace verified backups.
 
 ## Requirements
