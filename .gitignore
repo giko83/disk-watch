@@ -1,0 +1,6 @@
+/disk-watch.conf
+.env
+.env.*
+*.local
+*.bak
+*.pretest
