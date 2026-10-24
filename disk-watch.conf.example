@@ -1,0 +1,8 @@
+# Copy only once to /etc/disk-watch.conf; owner root, mode 600.
+HOST_LABEL=example-host
+# 'mail' for working local sendmail, e.g. Proxmox Notifications.
+# 'telegram' for direct Telegram API.
+TRANSPORT=telegram
+# TG_BOT_TOKEN='set-privately'
+# TG_CHAT_ID='set-privately'
+# PATTERN='I/O error|medium error|uncorrectable'
