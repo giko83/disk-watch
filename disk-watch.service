@@ -1,0 +1,7 @@
+[Unit]
+Description=Check kernel storage errors and send notifications
+After=systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/disk-watch.sh scan
