@@ -87,7 +87,7 @@ Run the isolated smoke tests locally (no disks, Telegram credentials, network
 calls, or production services are accessed):
 
 ```sh
-bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
+for file in disk-watch.sh install.sh update.sh tests/test-disk-watch.sh; do bash -n "$file"; done
 sh -n disk-watch-smart.sh
 bash tests/test-disk-watch.sh
 ```
