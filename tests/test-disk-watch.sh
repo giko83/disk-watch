@@ -79,4 +79,20 @@ bash "$SCRIPT" scan >/dev/null
 assert_cursor c2
 [[ $(wc -l < "$TMP/curl.log") -eq 1 ]] || fail 'clean interval sent an alert'
 
-echo 'PASS: cursor initialization, retry on failed notification, error delivery, clean scan'
+# SMART notifications must include device/message and must not touch the journal cursor.
+export SMARTD_DEVICE=/dev/sdz
+export SMARTD_MESSAGE='SMART threshold reached (test)'
+bash "$SCRIPT" smart >/dev/null
+assert_cursor c2
+[[ $(wc -l < "$TMP/curl.log") -eq 2 ]] || fail 'expected SMART alert after I/O alert'
+grep -Fq 'SMART ALERT - test-host - /dev/sdz' "$TMP/curl.body" || fail 'missing SMART device in subject'
+grep -Fq 'SMART threshold reached (test)' "$TMP/curl.body" || fail 'missing SMART description'
+
+# A failed SMART delivery must return an error and leave journal state unchanged.
+export MOCK_CURL_FAIL=1
+if bash "$SCRIPT" smart >/dev/null 2>&1; then fail 'SMART alert succeeded despite failed notification'; fi
+assert_cursor c2
+[[ $(wc -l < "$TMP/curl.log") -eq 2 ]] || fail 'failed SMART delivery recorded a success'
+unset SMARTD_DEVICE SMARTD_MESSAGE MOCK_CURL_FAIL
+
+echo 'PASS: cursor initialization, retry, error delivery, clean scan, SMART notification and failure'
