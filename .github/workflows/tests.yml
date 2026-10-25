@@ -1,0 +1,24 @@
+name: Disk Watch tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Check shell syntax
+        run: |
+          bash -n disk-watch.sh
+          bash -n install.sh
+          bash -n update.sh
+          bash -n tests/test-disk-watch.sh
+      - name: Run offline journal cursor regression
+        run: bash tests/test-disk-watch.sh
