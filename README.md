@@ -44,6 +44,8 @@ sudo bash /opt/disk-watch/update.sh
 
 This runs `git pull --ff-only` and redeploys the scripts. It does not overwrite your Telegram token or journal cursor. It is NOT a transactional rollback mechanism. Do not enable automatic updates until reviewed and tested.
 
+For safe rollout, verification, and manual rollback on existing hosts, see the [operations runbook](docs/operations.md). The updater does **not** provide automatic rollback.
+
 ## SMART integration
 
 Back up `/etc/smartd.conf`, then add the following to the appropriate monitored-device rule, keeping `-m root`:
