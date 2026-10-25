@@ -1,0 +1,21 @@
+name: Disk Watch smoke tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell syntax
+        run: |
+          bash -n disk-watch.sh install.sh update.sh
+          sh -n disk-watch-smart.sh
+          bash -n tests/test-disk-watch.sh
+      - name: Run isolated notification and cursor tests
+        run: bash tests/test-disk-watch.sh
