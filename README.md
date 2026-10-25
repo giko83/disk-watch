@@ -90,7 +90,7 @@ bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
 bash tests/test-disk-watch.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage focuses on journal cursor initialization, preserving pending alerts after a failed notification, successful delivery, and clean scans; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization, preserving pending alerts after failed delivery, successful I/O alert delivery, clean scans, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Known limitations
 
