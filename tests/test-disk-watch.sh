@@ -60,6 +60,12 @@ bash "$SCRIPT" init >/dev/null
 assert_cursor c0
 [[ ! -e "$TMP/curl.log" ]] || fail 'init unexpectedly sent an alert'
 
+# Re-running init must preserve the saved cursor and never send notifications.
+export MOCK_JOURNAL_MODE=error
+bash "$SCRIPT" init >/dev/null
+assert_cursor c0
+[[ ! -e "$TMP/curl.log" ]] || fail 'repeated init unexpectedly sent an alert'
+
 # Failed Telegram delivery must not advance the cursor; the event must remain retryable.
 export MOCK_JOURNAL_MODE=error MOCK_CURL_FAIL=1
 if bash "$SCRIPT" scan >/dev/null 2>&1; then fail 'scan succeeded despite failed notification'; fi
