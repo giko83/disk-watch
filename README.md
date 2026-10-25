@@ -81,6 +81,18 @@ systemctl list-timers disk-watch.timer
 journalctl -u disk-watch.service -n 30 --no-pager
 ```
 
+## Tests
+
+Run the isolated smoke tests before proposing changes:
+
+```sh
+bash -n disk-watch.sh install.sh update.sh
+sh -n disk-watch-smart.sh
+bash tests/test-disk-watch.sh
+```
+
+The test suite replaces `journalctl`, `curl`, and `logger` with temporary mocks. It checks that initialization preserves an existing cursor, a failed Telegram notification does **not** advance the journal cursor, a successful retry sends the alert and advances the cursor, and SMART notifications include the device and message. It does not contact Telegram, query disks, or touch system services. GitHub Actions runs these checks on pushes and pull requests.
+
 ## Known limitations
 
 - Journal rotation/cursor expiration may cause missed events; no continuous live daemon is used.
