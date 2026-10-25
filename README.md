@@ -81,6 +81,17 @@ systemctl list-timers disk-watch.timer
 journalctl -u disk-watch.service -n 30 --no-pager
 ```
 
+## Development and tests
+
+Run the isolated smoke tests before submitting a change:
+
+```sh
+bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
+bash tests/test-disk-watch.sh
+```
+
+The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization, preserving pending alerts after failed delivery, successful I/O alert delivery, clean scans, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+
 ## Known limitations
 
 - Journal rotation/cursor expiration may cause missed events; no continuous live daemon is used.
