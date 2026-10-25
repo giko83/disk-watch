@@ -81,6 +81,23 @@ systemctl list-timers disk-watch.timer
 journalctl -u disk-watch.service -n 30 --no-pager
 ```
 
+## Testing
+
+Run the isolated smoke tests locally (no disks, Telegram credentials, network
+calls, or production services are accessed):
+
+```sh
+bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
+sh -n disk-watch-smart.sh
+bash tests/test-disk-watch.sh
+```
+
+The test harness replaces `journalctl`, `curl`, and `logger` with temporary
+mocks and checks cursor initialization, clean scans, failed notification
+delivery, retry, failed journal reads, SMART forwarding, and test notifications.
+GitHub Actions runs these checks on pushes and pull requests. These tests do
+not establish that actual disk hardware or Telegram delivery works.
+
 ## Known limitations
 
 - Journal rotation/cursor expiration may cause missed events; no continuous live daemon is used.
