@@ -81,6 +81,16 @@ systemctl list-timers disk-watch.timer
 journalctl -u disk-watch.service -n 30 --no-pager
 ```
 
+## Regression tests
+
+Run the isolated Bash regression suite from a repository checkout:
+
+```sh
+bash tests/test-disk-watch.sh
+```
+
+The suite uses temporary files and mock `journalctl`, `curl`, and `logger` commands. It does not contact Telegram, inspect physical disks, or change system services. It covers cursor initialization, clean scans, retry behavior after notification failure, SMART forwarding, and empty journal output. Run it before proposing changes to `disk-watch.sh`.
+
 ## Known limitations
 
 - Journal rotation/cursor expiration may cause missed events; no continuous live daemon is used.
