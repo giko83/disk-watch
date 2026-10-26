@@ -63,8 +63,13 @@ HOST_LABEL=${HOST_LABEL:-$(hostname -s)}
 TRANSPORT=${TRANSPORT:-mail}
 STATE_DIR=${cli_state_dir:-${DISK_WATCH_STATE_DIR:-${STATE_DIR:-/var/lib/disk-watch}}}
 PATTERN=${PATTERN:-'I/O error|medium error|uncorrectable|unrecovered|critical medium|Buffer I/O error|failed command|blk_update_request|nvme.*(error|timeout)|ata[0-9].*(error|exception|failed)'}
-mkdir -p "$STATE_DIR"
-chmod 700 "$STATE_DIR"
+# Protect newly created cursor/lock files; do not chmod an existing directory
+# chosen by the caller (e.g. a shared parent directory in portable mode).
+umask 077
+if [[ ! -d "$STATE_DIR" ]]; then
+  mkdir -p -- "$STATE_DIR"
+  chmod 700 -- "$STATE_DIR"
+fi
 CURSOR_FILE="$STATE_DIR/kernel.cursor"
 
 notify() {
