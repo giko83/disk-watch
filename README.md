@@ -122,7 +122,8 @@ journalctl -u disk-watch.service -n 30 --no-pager
 Run the isolated smoke tests before submitting a change:
 
 ```sh
-bash -n disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh tests/test-portable-package.sh tests/test-install-preflight.sh
+for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/*.sh; do bash -n "$script"; done
+sh -n disk-watch-smart.sh
 bash tests/test-disk-watch.sh
 bash tests/test-mail-transport.sh
 bash tests/test-portable.sh
