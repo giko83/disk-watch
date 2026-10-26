@@ -9,6 +9,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 
 ### Fixed
 - Return a clear diagnostic when the kernel journal cannot be read rather than exposing only a raw journalctl failure.
+- Avoid changing the permissions of pre-existing state directories; use a private umask for new cursor and lock files.
 - Avoid exposing the Telegram bot token in `curl` command-line arguments by passing the URL via stdin; reject malformed token values before invoking curl.
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
