@@ -16,11 +16,11 @@ cd "$(dirname "$0")"
 # Read-only checks; safe to run as an unprivileged user before deploying.
 preflight() {
   local file cmd
-  for file in disk-watch.sh disk-watch-smart.sh disk-watch.service disk-watch.timer; do
+  for file in disk-watch.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
   done
 
-  (bash -n disk-watch.sh && bash -n install.sh) || {
+  (bash -n disk-watch.sh && bash -n install.sh && bash -n update.sh) || {
     echo 'Preflight failed: invalid Bash syntax' >&2
     return 1
   }

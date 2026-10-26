@@ -9,7 +9,7 @@ trap 'rm -rf -- "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 mkdir -p "$TMP/source" "$TMP/mock-bin"
-cp "$ROOT/install.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
+cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
    "$ROOT/disk-watch.service" "$ROOT/disk-watch.timer" "$TMP/source/"
 
 # If the preflight ever calls systemctl rather than just checking availability,
@@ -36,6 +36,24 @@ fi
 grep -Fq 'missing or empty disk-watch.timer' "$TMP/err" ||
   fail 'missing unit diagnostic absent'
 mv "$TMP/missing-timer" "$TMP/source/disk-watch.timer"
+
+# A missing updater must not pass a deployment preflight.
+mv "$TMP/source/update.sh" "$TMP/missing-updater"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing update.sh passed preflight'
+fi
+grep -Fq 'missing or empty update.sh' "$TMP/err" ||
+  fail 'missing updater diagnostic absent'
+mv "$TMP/missing-updater" "$TMP/source/update.sh"
+
+# Reject broken updater syntax before replacing installed files.
+printf '%s\n' 'if then' >> "$TMP/source/update.sh"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'broken updater syntax passed preflight'
+fi
+grep -Fq 'invalid Bash syntax' "$TMP/err" ||
+  fail 'invalid updater syntax diagnostic absent'
+cp "$ROOT/update.sh" "$TMP/source/update.sh"
 
 # A syntactically valid unit pointing at the wrong command must fail before
 # deployment; neither unit check should invoke systemctl.
@@ -69,4 +87,4 @@ fi
 grep -Fq 'Usage:' "$TMP/err" || fail 'invalid option diagnostic absent'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight or argument error invoked systemctl'
 
-echo 'PASS: read-only installer preflight, missing file, invalid syntax and option validation'
+echo 'PASS: read-only installer preflight, updater validation, unit checks, invalid syntax and options'
