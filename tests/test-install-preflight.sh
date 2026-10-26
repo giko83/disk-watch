@@ -37,6 +37,25 @@ grep -Fq 'missing or empty disk-watch.timer' "$TMP/err" ||
   fail 'missing unit diagnostic absent'
 mv "$TMP/missing-timer" "$TMP/source/disk-watch.timer"
 
+# A syntactically valid unit pointing at the wrong command must fail before
+# deployment; neither unit check should invoke systemctl.
+sed -i 's@ExecStart=/usr/local/sbin/disk-watch.sh scan@ExecStart=/bin/false@' "$TMP/source/disk-watch.service"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'mismatched service ExecStart passed preflight'
+fi
+grep -Fq 'ExecStart does not match' "$TMP/err" ||
+  fail 'missing service entry point diagnostic'
+sed -i 's@ExecStart=/bin/false@ExecStart=/usr/local/sbin/disk-watch.sh scan@' "$TMP/source/disk-watch.service"
+
+sed -i 's/Unit=disk-watch.service/Unit=other.service/' "$TMP/source/disk-watch.timer"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'mismatched timer target passed preflight'
+fi
+grep -Fq 'does not target disk-watch.service' "$TMP/err" ||
+  fail 'missing timer target diagnostic'
+sed -i 's/Unit=other.service/Unit=disk-watch.service/' "$TMP/source/disk-watch.timer"
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'unit validation invoked systemctl'
+
 printf '\nif then\n' >> "$TMP/source/disk-watch.sh"
 if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
   fail 'broken Bash syntax passed preflight'
