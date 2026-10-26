@@ -6,3 +6,8 @@ TRANSPORT=telegram
 # TG_BOT_TOKEN='set-privately'
 # TG_CHAT_ID='set-privately'
 # PATTERN='I/O error|medium error|uncorrectable'
+# Optional: persistent cursor/lock directory; override with --state-dir or
+# DISK_WATCH_STATE_DIR when running directly from a checkout.
+# STATE_DIR='/home/user/.local/state/disk-watch'
+# For no-install usage, see docs/portable.md. The config is sourced as Bash:
+# only load a trusted file and restrict permissions (chmod 600).
