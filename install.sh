@@ -20,7 +20,7 @@ preflight() {
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
   done
 
-  bash -n disk-watch.sh install.sh || {
+  (bash -n disk-watch.sh && bash -n install.sh) || {
     echo 'Preflight failed: invalid Bash syntax' >&2
     return 1
   }
