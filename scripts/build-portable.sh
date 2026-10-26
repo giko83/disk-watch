@@ -37,6 +37,17 @@ for file in "${FILES[@]}"; do
 done
 chmod 755 -- "$STAGE/disk-watch-portable/disk-watch.sh"
 
-mkdir -p -- "$(dirname "$OUTPUT")"
+# Checksums are a build-time convenience, not a new runtime requirement.
+# Fail before packaging if the host cannot generate a checksum.
+command -v sha256sum >/dev/null 2>&1 || {
+  echo 'Missing build tool: sha256sum' >&2
+  exit 1
+}
+OUTPUT_DIR=$(dirname -- "$OUTPUT")
+OUTPUT_FILE=$(basename -- "$OUTPUT")
+mkdir -p -- "$OUTPUT_DIR"
 tar -czf "$OUTPUT" -C "$STAGE" disk-watch-portable
-printf 'Portable archive created: %s\n' "$OUTPUT"
+# Write only the basename so the archive and sidecar remain verifiable
+# after moving both files together to a different directory.
+(cd -- "$OUTPUT_DIR" && sha256sum -- "$OUTPUT_FILE" > "$OUTPUT_FILE.sha256")
+printf 'Portable archive created: %s\nSHA-256 checksum: %s.sha256\n' "$OUTPUT" "$OUTPUT"
