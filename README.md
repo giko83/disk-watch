@@ -52,6 +52,14 @@ For a **new** host, create `/etc/disk-watch.conf` (as root) based on `disk-watch
 
 For an **existing** host that already has Disk Watch configured, *do not overwrite* `/etc/disk-watch.conf`. It stays in place along with `/var/lib/disk-watch/kernel.cursor`.
 
+Before installing, run the **read-only preflight** from the checkout (no root or host config required):
+
+```sh
+bash /opt/disk-watch/install.sh --preflight
+```
+
+It checks required source/unit files, shell syntax and core command availability without installing or contacting any disk. It does **not** validate the live notification transport, systemd runtime, or permissions; keep the backup and post-install checks described in the [operations runbook](docs/operations.md).
+
 Install the scripts and systemd units:
 
 ```sh
@@ -68,7 +76,7 @@ For a **manual update**, run:
 sudo bash /opt/disk-watch/update.sh
 ```
 
-This runs `git pull --ff-only` and redeploys the scripts. It does not overwrite your Telegram token or journal cursor. It is NOT a transactional rollback mechanism. Do not enable automatic updates until reviewed and tested.
+This runs `git pull --ff-only`, checks the downloaded checkout with `install.sh --preflight`, then redeploys the scripts only if preflight succeeds. If preflight fails, installed files are not replaced, **but the Git checkout has already advanced**. It does not overwrite your Telegram token or journal cursor. It is NOT a transactional rollback mechanism. Do not enable automatic updates until reviewed and tested.
 
 For safe rollout, verification, and manual rollback on existing hosts, see the [operations runbook](docs/operations.md). The updater does **not** provide automatic rollback.
 
@@ -114,14 +122,15 @@ journalctl -u disk-watch.service -n 30 --no-pager
 Run the isolated smoke tests before submitting a change:
 
 ```sh
-bash -n disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh tests/test-portable-package.sh
+bash -n disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh tests/test-portable-package.sh tests/test-install-preflight.sh
 bash tests/test-disk-watch.sh
 bash tests/test-mail-transport.sh
 bash tests/test-portable.sh
 bash tests/test-portable-package.sh
+bash tests/test-install-preflight.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, checks its exact allowlist and executes an offline init/check from the extracted tree. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, checks its exact allowlist and executes an offline init/check from the extracted tree. Installer preflight tests run without root and verify missing-file/syntax diagnostics without calling systemctl. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Roadmap and contributing
 
