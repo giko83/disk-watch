@@ -1,11 +1,54 @@
 #!/usr/bin/env bash
 # Run as root from a local Git checkout. Existing configs and journal cursor are preserved.
 set -euo pipefail
-[[ ${EUID} -eq 0 ]] || { echo 'Run with sudo' >&2; exit 1; }
+
+usage() {
+  echo 'Usage: bash install.sh [--preflight]' >&2
+}
+
+if (($# > 1)) || { (($# == 1)) && [[ $1 != --preflight ]]; }; then
+  usage
+  exit 2
+fi
+
 cd "$(dirname "$0")"
-bash -n disk-watch.sh
-bash -n install.sh
+
+# Read-only checks; safe to run as an unprivileged user before deploying.
+preflight() {
+  local file cmd
+  for file in disk-watch.sh disk-watch-smart.sh disk-watch.service disk-watch.timer; do
+    [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
+  done
+
+  bash -n disk-watch.sh install.sh || {
+    echo 'Preflight failed: invalid Bash syntax' >&2
+    return 1
+  }
+  sh -n disk-watch-smart.sh || {
+    echo 'Preflight failed: invalid SMART adapter syntax' >&2
+    return 1
+  }
+
+  # Core runtime and deployment tools only. curl/sendmail/smartctl are optional
+  # and depend on the selected notification and SMART integrations.
+  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+      echo "Preflight failed: required command not found: $cmd" >&2
+      return 1
+    }
+  done
+}
+
+if [[ ${1:-} == --preflight ]]; then
+  preflight
+  echo 'Preflight OK: local files, syntax and core commands. No installation performed.'
+  exit 0
+fi
+
+[[ ${EUID} -eq 0 ]] || { echo 'Run with sudo' >&2; exit 1; }
+preflight
 test -s /etc/disk-watch.conf || { echo 'Create /etc/disk-watch.conf first; see README' >&2; exit 1; }
+
 install -m 750 disk-watch.sh disk-watch-smart.sh /usr/local/sbin/
 install -m 644 disk-watch.service disk-watch.timer /etc/systemd/system/
 systemctl daemon-reload
