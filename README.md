@@ -13,7 +13,18 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 ## Requirements
 
-Linux, systemd, Bash, journalctl, grep, flock. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
+Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock` and standard utilities. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
+
+## Portable one-shot use (no installation)
+
+You can run `disk-watch.sh` directly from a source checkout or extracted tree, without root **when your user can read the kernel journal**, and without installing a systemd timer. Configure a private Bash config outside Git and a writable local state directory:
+
+```sh
+bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HOME/.local/state/disk-watch" init
+bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HOME/.local/state/disk-watch" check
+```
+
+`check` is a one-shot alias of `scan`. Both use the existing journal cursor and alert transport. `--help` works without a config file. The options `--config` and `--state-dir` can also be provided as `DISK_WATCH_CONFIG` and `DISK_WATCH_STATE_DIR` environment variables. **Portable mode currently still needs journald**; it does not run SMART self-tests or install a scheduler. See the [portable mode guide](docs/portable.md) for config examples, cron scheduling, permissions and limitations.
 
 ## Existing or new installation
 
@@ -90,18 +101,19 @@ journalctl -u disk-watch.service -n 30 --no-pager
 Run the isolated smoke tests before submitting a change:
 
 ```sh
-bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh tests/test-mail-transport.sh
+bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh
 bash tests/test-disk-watch.sh
 bash tests/test-mail-transport.sh
+bash tests/test-portable.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Roadmap and contributing
 
 Development priorities are tracked as [GitHub issues](https://github.com/giko83/disk-watch/issues). See the [issue-linked roadmap](docs/ROADMAP.md) for **16 proposed features**, their implementation order, acceptance criteria, and the project's minimal-dependency design principles.
 
-Highlights (planned, **not implemented yet**): on-demand and scheduled SMART short/long self-tests; history of results and device health; disk writes and wear statistics where firmware exposes them; disk-safe standby policies; and a standalone portable mode without mandatory systemd. See each issue for constraints and non-destructive testing requirements.
+Highlights (planned, **not implemented yet**): on-demand and scheduled SMART short/long self-tests; history of results and device health; disk writes and wear statistics where firmware exposes them; disk-safe standby policies; and additional portable packaging and non-journald compatibility (basic no-install CLI is available). See each issue for constraints and non-destructive testing requirements.
 
 Contributions should include offline tests and update the relevant README, examples and docs in the same change. Avoid overlapping PRs and never commit private Telegram credentials or host configuration. A GitHub merge does **not** deploy new code to production servers automatically.
 
