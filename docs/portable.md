@@ -1,6 +1,6 @@
 # Portable, no-install CLI (first step of issue #18)
 
-Disk Watch can run directly from a checkout or extracted source tree without installing a systemd service or writing to `/usr/local/sbin` or `/etc`. This is a **one-shot kernel-journal check**, not yet a portable release archive or a cross-platform journal backend.
+Disk Watch can run directly from a checkout or extracted source tree without installing a systemd service or writing to `/usr/local/sbin` or `/etc`. This is a **one-shot kernel-journal check**, not a cross-platform journal backend. A local portable archive can now be built from the repository; a published release is not yet available.
 
 ## Prerequisites
 
@@ -10,6 +10,21 @@ Disk Watch can run directly from a checkout or extracted source tree without ins
 - **No root, systemd timer, Git, database, Python or Node.js is required at runtime** if the invoking user can read the kernel journal and write to its chosen state directory. Many Linux installations restrict journal access to privileged users; check local policy rather than broadly weakening permissions.
 
 If `journalctl` is missing or its kernel journal is not readable, `init`/`check` fail with a diagnostic. Portable mode does **not** invent kernel events or silently substitute a different backend.
+
+## Create a portable archive (optional)
+
+From a checkout, run the offline builder:
+
+```sh
+bash scripts/build-portable.sh
+tar -xzf dist/disk-watch-portable.tar.gz
+cd disk-watch-portable
+bash ./disk-watch.sh --help
+```
+
+The builder accepts an optional output path, including paths with spaces: `bash scripts/build-portable.sh "/tmp/disk watch.tar.gz"`. It requires Bash, `tar`, `cp`, `mkdir`, `mktemp` and `chmod` but **not Git, root, a database, network or systemd** at build time. It packages an allowlisted set of public files: the CLI, sample config, README, license, changelog and documentation. It deliberately excludes the real config, tokens, cursor, state, Git metadata and systemd units. The resulting archive is a source bundle, not a compiled executable or a tagged release. Extract it into a directory you control.
+
+Run `init` and `check` from the extracted directory with your private config and state directory **outside** the archive, as described below. Runtime kernel monitoring still needs an accessible `journalctl` and a chosen notification transport. The builder does not install or update services.
 
 ## Run once, without installation
 
@@ -49,4 +64,4 @@ Use an account with journal access and a writable state directory. Cron's enviro
 - The kernel journal and persistent cursor are still required; unsupported Linux distributions without journald need a future backend.
 - Journal read errors cause a failure and leave the cursor unchanged. **Journal rotation or an expired cursor can still create a gap that the current monitor does not always detect**; review the kernel journal and reinitialize the cursor only deliberately.
 - The portable workflow does not update installed production services. Keep configs and tokens out of Git and avoid using a world-readable state directory.
-- The standalone release archive, additional portability testing and any non-journald backend remain tracked under [issue #18](https://github.com/giko83/disk-watch/issues/18).
+- Formal release distribution, additional platform compatibility tests and any non-journald backend remain tracked under [issue #18](https://github.com/giko83/disk-watch/issues/18).
