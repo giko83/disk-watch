@@ -64,7 +64,7 @@ Test a SMART notification by temporarily appending `-M test` and running `smartd
 
 ## Configuration and privacy
 
-Keep tokens and host-specific settings in `/etc/disk-watch.conf`, owned by root with permission `600`. It is **never** part of the Git checkout. Avoid pasting Telegram tokens in issues or pull requests.
+Keep tokens and host-specific settings in `/etc/disk-watch.conf`, owned by root with permission `600`. It is **never** part of the Git checkout. Avoid pasting Telegram tokens in issues or pull requests. The Telegram transport validates the bot token format and passes its URL to `curl` through standard input rather than a process command-line argument, reducing accidental exposure in process listings. Root-level process inspection and the configuration file still require normal host security controls.
 
 ```ini
 HOST_LABEL=my-server
@@ -94,7 +94,7 @@ bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
 bash tests/test-disk-watch.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Known limitations
 

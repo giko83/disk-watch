@@ -29,6 +29,7 @@ MOCK
 cat > "$TMP/bin/curl" <<'MOCK'
 #!/usr/bin/env bash
 if [[ ${MOCK_CURL_FAIL:-0} == 1 ]]; then exit 22; fi
+cat > "$MOCK_CURL_STDIN"
 printf 'call\n' >> "$MOCK_CURL_LOG"
 printf '%s' "$*" > "$MOCK_CURL_BODY"
 MOCK
@@ -42,13 +43,14 @@ chmod +x "$TMP/bin/"*
 cat > "$TMP/disk-watch.conf" <<EOF_CONFIG
 HOST_LABEL=test-host
 TRANSPORT=telegram
-TG_BOT_TOKEN=not-a-real-token
+TG_BOT_TOKEN=123456:not-a-real-token
 TG_CHAT_ID=not-a-real-chat
 STATE_DIR='$TMP/state'
 EOF_CONFIG
 export DISK_WATCH_CONFIG="$TMP/disk-watch.conf"
 export MOCK_CURL_LOG="$TMP/curl.log"
 export MOCK_CURL_BODY="$TMP/curl.body"
+export MOCK_CURL_STDIN="$TMP/curl.stdin"
 export PATH="$TMP/bin:$PATH"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -86,12 +88,24 @@ fi
 assert_cursor c0
 [[ ! -e "$TMP/curl.log" ]] || fail 'scan called Telegram despite missing credentials'
 
+# Malformed bot tokens must be rejected before curl starts; no cursor advancement.
+sed 's/^TG_BOT_TOKEN=.*/TG_BOT_TOKEN=invalid-token/' "$TMP/disk-watch.conf" > "$TMP/invalid-token.conf"
+if DISK_WATCH_CONFIG="$TMP/invalid-token.conf" bash "$SCRIPT" scan >/dev/null 2>&1; then
+  fail 'scan accepted malformed Telegram bot token'
+fi
+assert_cursor c0
+[[ ! -e "$TMP/curl.log" ]] || fail 'invalid bot token unexpectedly invoked curl'
+
 # A subsequent successful scan must deliver the pending error and advance the cursor.
 export MOCK_CURL_FAIL=0
 bash "$SCRIPT" scan >/dev/null
 assert_cursor c1
 [[ $(wc -l < "$TMP/curl.log") -eq 1 ]] || fail 'expected one alert'
 grep -q 'I/O error, dev sdb' "$TMP/curl.body" || fail 'missing error details in alert'
+# Bot credentials must not be visible in curl's process arguments.
+if grep -Fq '123456:not-a-real-token' "$TMP/curl.body"; then fail 'bot token exposed in curl arguments'; fi
+grep -Fq -- '--config -' "$TMP/curl.body" || fail 'curl is not reading its config from stdin'
+grep -Fq 'url = "https://api.telegram.org/bot123456:not-a-real-token/sendMessage"' "$TMP/curl.stdin" || fail 'curl stdin config lacks the bot URL'
 
 # A clean journal interval should advance the cursor without notifying.
 export MOCK_JOURNAL_MODE=clean
@@ -124,4 +138,4 @@ assert_cursor c3
 grep -Fq 'I/O error, dev sdc' "$TMP/curl.body" || fail 'missing later I/O error details'
 unset MOCK_LOGGER_FAIL
 
-echo 'PASS: cursor initialization, retry, missing credentials, error delivery, clean scan, SMART notification/failure, logger failure'
+echo 'PASS: cursor initialization, retry, missing/invalid credentials, hidden Telegram token, error delivery, clean scan, SMART notification/failure, logger failure'
