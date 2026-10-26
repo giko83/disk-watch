@@ -97,6 +97,14 @@ bash tests/test-mail-transport.sh
 
 The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
+## Roadmap and contributing
+
+Development priorities are tracked as [GitHub issues](https://github.com/giko83/disk-watch/issues). See the [issue-linked roadmap](docs/ROADMAP.md) for **16 proposed features**, their implementation order, acceptance criteria, and the project's minimal-dependency design principles.
+
+Highlights (planned, **not implemented yet**): on-demand and scheduled SMART short/long self-tests; history of results and device health; disk writes and wear statistics where firmware exposes them; disk-safe standby policies; and a standalone portable mode without mandatory systemd. See each issue for constraints and non-destructive testing requirements.
+
+Contributions should include offline tests and update the relevant README, examples and docs in the same change. Avoid overlapping PRs and never commit private Telegram credentials or host configuration. A GitHub merge does **not** deploy new code to production servers automatically.
+
 ## Known limitations
 
 - Journal rotation/cursor expiration may cause missed events; no continuous live daemon is used.
