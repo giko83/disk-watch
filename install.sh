@@ -37,6 +37,18 @@ preflight() {
       return 1
     }
   done
+
+  # This installer deploys fixed unit names and executable paths. Detect
+  # accidental drift before replacing installed files, without invoking
+  # systemctl or adding a systemd-analyze dependency. Not a full unit parser.
+  grep -Fxq 'ExecStart=/usr/local/sbin/disk-watch.sh scan' disk-watch.service || {
+    echo 'Preflight failed: disk-watch.service ExecStart does not match the installed monitor' >&2
+    return 1
+  }
+  grep -Fxq 'Unit=disk-watch.service' disk-watch.timer || {
+    echo 'Preflight failed: disk-watch.timer does not target disk-watch.service' >&2
+    return 1
+  }
 }
 
 if [[ ${1:-} == --preflight ]]; then
