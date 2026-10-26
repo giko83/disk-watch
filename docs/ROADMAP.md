@@ -4,7 +4,7 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-26.
 
-**In progress:** #18 has a first no-install CLI step (`check`, `--config`, `--state-dir` and mocked regression tests). The issue stays open until portable release packaging and the remaining acceptance criteria are verified. See [portable usage](portable.md).
+**In progress:** #18 has a no-install CLI (`check`, `--config`, `--state-dir`) and an offline portable source-archive builder with mocked regression tests. The issue stays open until published release packaging, additional compatibility coverage and the remaining acceptance criteria are verified. See [portable usage](portable.md).
 
 ## Design constraints
 
