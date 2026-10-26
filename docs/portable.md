@@ -29,7 +29,7 @@ bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HO
 bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HOME/.local/state/disk-watch" check
 ```
 
-`init` deliberately starts monitoring **after** the latest existing kernel event; historical events are not replayed. It preserves an existing cursor. `check` is an alias for the existing `scan` command and advances the cursor only after notification delivery succeeds. The default command remains `scan` for backward compatibility. State and lock files are created under the selected directory.
+`init` deliberately starts monitoring **after** the latest existing kernel event; historical events are not replayed. It preserves an existing cursor. `check` is an alias for the existing `scan` command and advances the cursor only after notification delivery succeeds. The default command remains `scan` for backward compatibility. State and lock files are created under the selected directory. New state directories and files use private permissions; existing directories are **not chmodded** by the CLI, so choose a directory with appropriate access controls.
 
 Options can appear before or after the command. The CLI takes precedence over `DISK_WATCH_CONFIG` and `DISK_WATCH_STATE_DIR` environment variables; the state directory also falls back to `STATE_DIR` inside the config, then `/var/lib/disk-watch`. Paths containing spaces are supported when quoted.
 
