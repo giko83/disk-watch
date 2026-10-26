@@ -90,11 +90,12 @@ journalctl -u disk-watch.service -n 30 --no-pager
 Run the isolated smoke tests before submitting a change:
 
 ```sh
-bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh
+bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh tests/test-mail-transport.sh
 bash tests/test-disk-watch.sh
+bash tests/test-mail-transport.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, and `logger`; they do **not** access real disks, send Telegram messages, or change systemd services. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Known limitations
 
