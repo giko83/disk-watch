@@ -70,7 +70,8 @@ case "${1:-scan}" in
 $sample
 
 Inspect: journalctl -k"
-      logger -t disk-watch "Sent alert for $count kernel events"
+      # Logging is best-effort; an already-delivered alert must not be retried.
+      logger -t disk-watch "Sent alert for $count kernel events" || true
     fi
     printf '%s\n' "$cursor" > "$CURSOR_FILE.tmp"
     chmod 600 "$CURSOR_FILE.tmp"
