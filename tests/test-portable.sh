@@ -61,6 +61,14 @@ bash "$SCRIPT" check --config "$TMP/config with spaces.conf" --state-dir "$TMP/c
 [[ $(cat "$TMP/cli state/kernel.cursor") == portable1 ]] || fail 'check did not advance cursor'
 grep -Fq 'DISK I/O ALERT - portable-host' "$TMP/mail.body" || fail 'portable check did not alert'
 
+# Existing directories must not have their permissions rewritten by the CLI.
+mkdir -p "$TMP/existing dir"
+chmod 755 "$TMP/existing dir"
+export MOCK_JOURNAL_MODE=init
+bash "$SCRIPT" --config "$TMP/config with spaces.conf" --state-dir "$TMP/existing dir" init > /dev/null
+[[ $(stat -c '%a' "$TMP/existing dir") == 755 ]] || fail 'existing state directory permissions changed'
+[[ $(stat -c '%a' "$TMP/existing dir/kernel.cursor") == 600 ]] || fail 'cursor permissions are not private'
+
 # Environment paths also work when no CLI override is supplied.
 export DISK_WATCH_CONFIG="$TMP/config with spaces.conf" MOCK_JOURNAL_MODE=init
 bash "$SCRIPT" init > /dev/null
