@@ -11,6 +11,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Reject packaged systemd units whose service `ExecStart` or timer `Unit` no longer points to the installed Disk Watch entry points during read-only preflight; no extra runtime dependency or systemctl invocation.
 - Avoid creating or requiring a writable state directory for notification-only `test` and `smart` commands in portable mode; add an offline regression test.
 - Return a clear diagnostic when the kernel journal cannot be read rather than exposing only a raw journalctl failure.
 - Avoid changing the permissions of pre-existing state directories; use a private umask for new cursor and lock files.
@@ -18,6 +19,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Exercise preflight rejection of syntactically valid but misdirected service/timer units with offline fixtures, without invoking systemctl.
 - Verify the portable archive checksum, basename portability and rejection of modified archive contents with offline tests.
 - Fix CI syntax checks to validate each Bash script separately rather than treating additional paths as arguments to the first script; validate the POSIX SMART adapter with `sh -n`.
 - Add offline installer preflight regression coverage for missing files, invalid Bash syntax, unsupported arguments and no systemctl invocation.
