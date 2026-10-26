@@ -47,6 +47,6 @@ Use an account with journal access and a writable state directory. Cron's enviro
 
 - No SMART test is started by `check`; SMART remains separately integrated through `smartd`.
 - The kernel journal and persistent cursor are still required; unsupported Linux distributions without journald need a future backend.
-- An inaccessible/rotated cursor or journal read failure must be investigated. Disk Watch does not silently skip unknown gaps.
+- Journal read errors cause a failure and leave the cursor unchanged. **Journal rotation or an expired cursor can still create a gap that the current monitor does not always detect**; review the kernel journal and reinitialize the cursor only deliberately.
 - The portable workflow does not update installed production services. Keep configs and tokens out of Git and avoid using a world-readable state directory.
 - The standalone release archive, additional portability testing and any non-journald backend remain tracked under [issue #18](https://github.com/giko83/disk-watch/issues/18).
