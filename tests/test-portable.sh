@@ -48,6 +48,17 @@ EOF_CONFIG
 export DISK_WATCH_CONFIG="$TMP/invalid-env.conf"
 export DISK_WATCH_STATE_DIR="$TMP/env state"
 
+# Notification-only commands should not create a cursor or require writable state.
+# Even a failing journal mock must never be called for these operations.
+export MOCK_JOURNAL_MODE=fail
+bash "$SCRIPT" --config "$TMP/config with spaces.conf" --state-dir "$TMP/notify only state" test > /dev/null
+[[ ! -e "$TMP/notify only state" ]] || fail 'test created an unused state directory'
+grep -Fq 'TEST DISK WATCH - portable-host' "$TMP/mail.body" || fail 'test notification missing'
+SMARTD_DEVICE=/dev/mock SMARTD_MESSAGE='Offline SMART event' \
+  bash "$SCRIPT" smart --config "$TMP/config with spaces.conf" --state-dir "$TMP/notify only state" > /dev/null
+[[ ! -e "$TMP/notify only state" ]] || fail 'smart created an unused state directory'
+grep -Fq 'Offline SMART event' "$TMP/mail.body" || fail 'SMART notification missing'
+
 # CLI values override environment and sourced configuration; paths may contain spaces.
 export MOCK_JOURNAL_MODE=init
 bash "$SCRIPT" --config "$TMP/config with spaces.conf" init --state-dir "$TMP/cli state" > /dev/null
@@ -88,4 +99,4 @@ grep -Fq 'Missing value for --state-dir' "$TMP/err" || fail 'missing value diagn
 if bash "$SCRIPT" bogus > "$TMP/out" 2> "$TMP/err"; then fail 'unknown command accepted'; fi
 grep -Fq 'Unknown command' "$TMP/err" || fail 'unknown command diagnostic absent'
 
-echo 'PASS: portable CLI, path overrides with spaces, one-shot check, journal errors, help and validation'
+echo 'PASS: portable CLI, notification-only commands without state, path overrides, one-shot check, journal errors, help and validation'

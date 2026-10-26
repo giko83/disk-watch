@@ -24,7 +24,7 @@ bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HO
 bash ./disk-watch.sh --config "$HOME/.config/disk-watch/config" --state-dir "$HOME/.local/state/disk-watch" check
 ```
 
-`check` is a one-shot alias of `scan`. Both use the existing journal cursor and alert transport. `--help` works without a config file. The options `--config` and `--state-dir` can also be provided as `DISK_WATCH_CONFIG` and `DISK_WATCH_STATE_DIR` environment variables. **Portable mode currently still needs journald**; it does not run SMART self-tests or install a scheduler. See the [portable mode guide](docs/portable.md) for config examples, cron scheduling, permissions and limitations.
+`check` is a one-shot alias of `scan`. Both use the existing journal cursor and alert transport. The notification-only `test` and `smart` commands do not create a state directory or require access to a writable cursor location. `--help` works without a config file. The options `--config` and `--state-dir` can also be provided as `DISK_WATCH_CONFIG` and `DISK_WATCH_STATE_DIR` environment variables. **Portable mode currently still needs journald**; it does not run SMART self-tests or install a scheduler. See the [portable mode guide](docs/portable.md) for config examples, cron scheduling, permissions and limitations.
 
 ## Build a no-install portable archive
 
