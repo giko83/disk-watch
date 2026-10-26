@@ -53,7 +53,7 @@ preflight() {
 
 if [[ ${1:-} == --preflight ]]; then
   preflight
-  echo 'Preflight OK: local files, syntax and core commands. No installation performed.'
+  echo 'Preflight OK: local files, syntax, core commands and unit entry points. No installation performed.'
   exit 0
 fi
 
