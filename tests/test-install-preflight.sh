@@ -47,7 +47,7 @@ grep -Fq 'missing or empty update.sh' "$TMP/err" ||
 mv "$TMP/missing-updater" "$TMP/source/update.sh"
 
 # Reject broken updater syntax before replacing installed files.
-printf '\\nif then\\n' >> "$TMP/source/update.sh"
+printf '%s\n' 'if then' >> "$TMP/source/update.sh"
 if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
   fail 'broken updater syntax passed preflight'
 fi
