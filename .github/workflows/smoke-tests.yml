@@ -14,8 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Bash syntax
-        run: bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh tests/test-mail-transport.sh
+        run: bash -n disk-watch.sh install.sh update.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh
       - name: Run isolated journal and notification tests
         run: |
           bash tests/test-disk-watch.sh
           bash tests/test-mail-transport.sh
+          bash tests/test-portable.sh

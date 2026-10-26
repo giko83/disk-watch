@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-26.
 
+**In progress:** #18 has a first no-install CLI step (`check`, `--config`, `--state-dir` and mocked regression tests). The issue stays open until portable release packaging and the remaining acceptance criteria are verified. See [portable usage](portable.md).
+
 ## Design constraints
 
 1. **Minimal dependencies:** Bash and common Linux utilities for the existing kernel log monitor; `smartctl` (smartmontools) is optional and required only for SMART operations; `curl` for HTTP notifications, `sendmail` for mail, `git` only for Git-based updates. No mandatory database, Python, Node.js, UI server, cloud, or continuously running agent.
