@@ -20,7 +20,7 @@ On each host, one at a time:
 
    If a file is absent, stop and inspect the existing installation rather than assuming these commands are universal.
 
-4. Clone the public repository to `/opt/disk-watch`, review the diff against the installed scripts, then run `sudo bash /opt/disk-watch/install.sh`.
+4. Clone the public repository to `/opt/disk-watch`, review the diff against the installed scripts, and run `bash /opt/disk-watch/install.sh --preflight` **without sudo**. This read-only check validates required files, shell syntax and core command availability. It does **not** validate running systemd, config permissions or notification delivery. If it fails, stop before replacing installed files. Then run `sudo bash /opt/disk-watch/install.sh`.
 5. Check `systemctl list-timers disk-watch.timer`, `systemctl status disk-watch.timer --no-pager`, and `journalctl -u disk-watch.service -n 30 --no-pager`. Run `sudo /usr/local/sbin/disk-watch.sh test` and **verify receipt** through the configured transport.
 
 The installer does not change `/etc/disk-watch.conf`, `/etc/smartd.conf`, or `/var/lib/disk-watch/kernel.cursor`. Those files are host-specific; never commit them or paste secrets into GitHub issues.
@@ -33,7 +33,7 @@ The installer does not change `/etc/disk-watch.conf`, `/etc/smartd.conf`, or `/v
 - Preserve copies of the currently installed scripts and units (see above). **The current `update.sh` is not transactional and does not automatically restore the previous version.**
 - Update **one host at a time**, verify notifications and timer behavior, then continue to the next host.
 
-Run `sudo bash /opt/disk-watch/update.sh` only after review. This executes `git pull --ff-only` and `install.sh`.
+Run `sudo bash /opt/disk-watch/update.sh` only after review. It executes `git pull --ff-only`, then a read-only `install.sh --preflight` before attempting installation. A preflight failure leaves installed scripts and units unchanged, **but the Git checkout is already updated**; it does not restore the previous commit. Installation failures after preflight can still leave partial changes, so keep backups and verify each host.
 
 ## Manual rollback of deployed files
 

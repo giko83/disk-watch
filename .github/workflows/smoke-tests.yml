@@ -14,10 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Bash syntax
-        run: bash -n disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/test-disk-watch.sh tests/test-mail-transport.sh tests/test-portable.sh tests/test-portable-package.sh
+        run: |
+          for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/*.sh; do
+            bash -n "$script"
+          done
+          sh -n disk-watch-smart.sh
       - name: Run isolated journal and notification tests
         run: |
           bash tests/test-disk-watch.sh
           bash tests/test-mail-transport.sh
           bash tests/test-portable.sh
           bash tests/test-portable-package.sh
+          bash tests/test-install-preflight.sh
