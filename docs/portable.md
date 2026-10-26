@@ -17,12 +17,13 @@ From a checkout, run the offline builder:
 
 ```sh
 bash scripts/build-portable.sh
+(cd dist && sha256sum -c disk-watch-portable.tar.gz.sha256)
 tar -xzf dist/disk-watch-portable.tar.gz
 cd disk-watch-portable
 bash ./disk-watch.sh --help
 ```
 
-The builder accepts an optional output path, including paths with spaces: `bash scripts/build-portable.sh "/tmp/disk watch.tar.gz"`. It requires Bash, `tar`, `cp`, `mkdir`, `mktemp` and `chmod` but **not Git, root, a database, network or systemd** at build time. It packages an allowlisted set of public files: the CLI, sample config, README, license, changelog and documentation. It deliberately excludes the real config, tokens, cursor, state, Git metadata and systemd units. The resulting archive is a source bundle, not a compiled executable or a tagged release. Extract it into a directory you control.
+The builder accepts an optional output path, including paths with spaces: `bash scripts/build-portable.sh "/tmp/disk watch.tar.gz"`. It requires Bash, `tar`, `cp`, `mkdir`, `mktemp`, `chmod` and `sha256sum` but **not Git, root, a database, network or systemd** at build time. The builder creates a companion `<archive>.sha256` file. Keep the two files together; the checksum records only the archive basename, so verification also works after moving them. A SHA-256 checksum detects accidental corruption but does **not** authenticate the source or replace a signed release. It packages an allowlisted set of public files: the CLI, sample config, README, license, changelog and documentation. It deliberately excludes the real config, tokens, cursor, state, Git metadata and systemd units. The resulting archive is a source bundle, not a compiled executable or a tagged release. Extract it into a directory you control.
 
 Run `init` and `check` from the extracted directory with your private config and state directory **outside** the archive, as described below. Runtime kernel monitoring still needs an accessible `journalctl` and a chosen notification transport. The builder does not install or update services.
 

@@ -32,12 +32,13 @@ For an offline, self-contained **source archive** containing the one-shot CLI, e
 
 ```sh
 bash scripts/build-portable.sh
+(cd dist && sha256sum -c disk-watch-portable.tar.gz.sha256)
 tar -xzf dist/disk-watch-portable.tar.gz
 cd disk-watch-portable
 bash ./disk-watch.sh --help
 ```
 
-The archive builder needs only Bash and standard utilities (`tar`, `cp`, `mktemp`); no root, Git at build time, Python, database, network or systemd timer. The archive includes only an explicit list of public files, **not** your real configuration, secrets, cursor or local state. Keep a trusted configuration outside the extracted directory and use `--config` / `--state-dir` as shown above. Kernel checks still require a readable `journalctl`; the archive is not a prebuilt binary or a GitHub release. See [portable usage](docs/portable.md).
+The archive builder needs only Bash and standard Linux utilities (`tar`, `cp`, `mktemp`, `sha256sum`); no root, Git at build time, Python, database, network or systemd timer. It writes a companion `.sha256` file to check for accidental archive corruption (not a signature or proof of authenticity). The archive includes only an explicit list of public files, **not** your real configuration, secrets, cursor or local state. Keep a trusted configuration outside the extracted directory and use `--config` / `--state-dir` as shown above. Kernel checks still require a readable `journalctl`; the archive is not a prebuilt binary or a GitHub release. See [portable usage](docs/portable.md).
 
 ## Existing or new installation
 
@@ -131,7 +132,7 @@ bash tests/test-portable-package.sh
 bash tests/test-install-preflight.sh
 ```
 
-The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, checks its exact allowlist and executes an offline init/check from the extracted tree. Installer preflight tests run without root and verify missing-file/syntax diagnostics without calling systemctl. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
+The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, verifies its SHA-256 sidecar and rejection of tampering, checks its exact allowlist and executes an offline init/check from the extracted tree. Installer preflight tests run without root and verify missing-file/syntax diagnostics without calling systemctl. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
 ## Roadmap and contributing
 
