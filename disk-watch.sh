@@ -1,13 +1,67 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG=${DISK_WATCH_CONFIG:-/etc/disk-watch.conf}
+# Parse portable CLI options before reading configuration or touching state.
+usage() {
+  cat <<'USAGE'
+Usage: disk-watch.sh [--config FILE] [--state-dir DIR] [init|check|scan|test|smart]
+
+  check     Scan new kernel messages once (alias of scan; suitable for cron).
+  init      Seed the journal cursor without replaying older messages.
+  scan      Scan new kernel messages (also the default command).
+  test      Send a notification test.
+  smart     Forward a smartd notification.
+
+  --config FILE     Use a trusted Bash configuration file (default /etc/disk-watch.conf).
+  --state-dir DIR   Keep cursor and lock files in DIR (default /var/lib/disk-watch).
+  --help            Show this help without loading configuration.
+
+Environment: DISK_WATCH_CONFIG, DISK_WATCH_STATE_DIR are also supported.
+CLI options take precedence over environment and configuration settings.
+USAGE
+}
+
+cli_config=''
+cli_state_dir=''
+command_name=''
+while (($# > 0)); do
+  case "$1" in
+    --help|-h) usage; exit 0 ;;
+    --config|--state-dir)
+      option=$1
+      if (($# < 2)) || [[ -z ${2:-} || ${2:-} == --* ]]; then
+        echo "Missing value for $option" >&2; exit 2
+      fi
+      if [[ $option == --config ]]; then cli_config=$2; else cli_state_dir=$2; fi
+      shift 2
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [[ -n $command_name ]]; then
+        echo "Unexpected argument: $1" >&2; usage >&2; exit 2
+      fi
+      command_name=$1
+      shift
+      ;;
+  esac
+done
+command_name=${command_name:-scan}
+case "$command_name" in
+  init|scan|check|test|smart) ;;
+  *) echo "Unknown command: $command_name" >&2; usage >&2; exit 2 ;;
+esac
+
+CONFIG=${cli_config:-${DISK_WATCH_CONFIG:-/etc/disk-watch.conf}}
 if [[ ! -r "$CONFIG" ]]; then echo "Missing config: $CONFIG" >&2; exit 1; fi
 # shellcheck source=/dev/null
 source "$CONFIG"
 HOST_LABEL=${HOST_LABEL:-$(hostname -s)}
 TRANSPORT=${TRANSPORT:-mail}
-STATE_DIR=${STATE_DIR:-/var/lib/disk-watch}
+STATE_DIR=${cli_state_dir:-${DISK_WATCH_STATE_DIR:-${STATE_DIR:-/var/lib/disk-watch}}}
 PATTERN=${PATTERN:-'I/O error|medium error|uncorrectable|unrecovered|critical medium|Buffer I/O error|failed command|blk_update_request|nvme.*(error|timeout)|ata[0-9].*(error|exception|failed)'}
 mkdir -p "$STATE_DIR"
 chmod 700 "$STATE_DIR"
@@ -38,7 +92,14 @@ $body" >/dev/null
   esac
 }
 
-case "${1:-scan}" in
+require_journal() {
+  command -v journalctl >/dev/null 2>&1 || {
+    echo 'journalctl is missing; kernel monitoring needs an accessible systemd journal.' >&2
+    return 1
+  }
+}
+
+case "$command_name" in
   test)
     notify "TEST DISK WATCH - $HOST_LABEL" "Disk Watch notification test from $HOST_LABEL."
     echo 'Notification submitted; verify receipt.'
@@ -50,19 +111,27 @@ case "${1:-scan}" in
     ;;
   init)
     if [[ -s "$CURSOR_FILE" ]]; then echo 'Cursor already exists; no reset.'; exit 0; fi
-    latest=$(journalctl -k -n 1 --show-cursor --no-pager -o short-iso)
+    require_journal
+    latest=$(journalctl -k -n 1 --show-cursor --no-pager -o short-iso) || {
+      echo 'Cannot read kernel journal; check journald availability and journal permissions.' >&2
+      exit 1
+    }
     cursor=$(printf '%s\n' "$latest" | sed -n 's/^-- cursor: //p' | tail -n 1)
     [[ -n "$cursor" ]] || { echo 'Cannot initialize journal cursor' >&2; exit 1; }
     printf '%s\n' "$cursor" > "$CURSOR_FILE"
     chmod 600 "$CURSOR_FILE"
     echo 'Initialized; historic kernel events excluded.'
     ;;
-  scan)
+  scan|check)
     [[ -s "$CURSOR_FILE" ]] || { echo 'Run init first' >&2; exit 1; }
+    require_journal
     exec 9>"$STATE_DIR/scan.lock"
     flock -n 9 || exit 0
     previous=$(<"$CURSOR_FILE")
-    data=$(journalctl -k --after-cursor="$previous" --show-cursor --no-pager -o short-iso)
+    data=$(journalctl -k --after-cursor="$previous" --show-cursor --no-pager -o short-iso) || {
+      echo 'Cannot read kernel journal; check journald availability, permissions or cursor validity.' >&2
+      exit 1
+    }
     cursor=$(printf '%s\n' "$data" | sed -n 's/^-- cursor: //p' | tail -n 1)
     [[ -n "$cursor" ]] || exit 0
     matches=$(printf '%s\n' "$data" | grep -Ei "$PATTERN" || true)
@@ -81,5 +150,5 @@ Inspect: journalctl -k"
     chmod 600 "$CURSOR_FILE.tmp"
     mv -f "$CURSOR_FILE.tmp" "$CURSOR_FILE"
     ;;
-  *) echo "Usage: $0 [init|scan|test|smart]" >&2; exit 2;;
+  *) echo "Unsupported command: $command_name" >&2; exit 2;;
 esac
