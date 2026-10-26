@@ -72,6 +72,16 @@ if bash "$SCRIPT" scan >/dev/null 2>&1; then fail 'scan succeeded despite failed
 assert_cursor c0
 [[ ! -e "$TMP/curl.log" ]] || fail 'failed mock delivery recorded a success'
 
+# Missing Telegram credentials must fail closed and keep the pending alert retryable.
+# Use a separate config to avoid exposing a real token or mutating the base config.
+grep -v '^TG_BOT_TOKEN=' "$TMP/disk-watch.conf" > "$TMP/no-token.conf"
+export MOCK_CURL_FAIL=0
+if DISK_WATCH_CONFIG="$TMP/no-token.conf" bash "$SCRIPT" scan >/dev/null 2>&1; then
+  fail 'scan succeeded despite missing Telegram bot token'
+fi
+assert_cursor c0
+[[ ! -e "$TMP/curl.log" ]] || fail 'scan called Telegram despite missing credentials'
+
 # A subsequent successful scan must deliver the pending error and advance the cursor.
 export MOCK_CURL_FAIL=0
 bash "$SCRIPT" scan >/dev/null
@@ -101,4 +111,4 @@ assert_cursor c2
 [[ $(wc -l < "$TMP/curl.log") -eq 2 ]] || fail 'failed SMART delivery recorded a success'
 unset SMARTD_DEVICE SMARTD_MESSAGE MOCK_CURL_FAIL
 
-echo 'PASS: cursor initialization, retry, error delivery, clean scan, SMART notification and failure'
+echo 'PASS: cursor initialization, retry, missing credentials, error delivery, clean scan, SMART notification and failure'
