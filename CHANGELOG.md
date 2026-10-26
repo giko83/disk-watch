@@ -7,7 +7,6 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ### Added
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
-
 ### Fixed
 - Return a clear diagnostic when the kernel journal cannot be read rather than exposing only a raw journalctl failure.
 - Avoid exposing the Telegram bot token in `curl` command-line arguments by passing the URL via stdin; reject malformed token values before invoking curl.
