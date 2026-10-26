@@ -25,6 +25,11 @@ cat > "$TMP/mock bin/sendmail" <<'MOCK'
 [[ "$*" == '-i -t' ]] || exit 2
 cat > "$MOCK_MAIL_BODY"
 MOCK
+cat > "$TMP/mock bin/logger" <<'MOCK'
+#!/usr/bin/env bash
+# Never contact host syslog during offline regression tests.
+exit 0
+MOCK
 chmod +x "$TMP/mock bin/"*
 export PATH="$TMP/mock bin:$PATH"
 export MOCK_MAIL_BODY="$TMP/mail.body"
