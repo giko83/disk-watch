@@ -23,10 +23,14 @@ notify() {
     telegram)
       [[ -n "${TG_BOT_TOKEN:-}" && -n "${TG_CHAT_ID:-}" ]] || { echo 'Telegram credentials missing' >&2; return 1; }
       command -v curl >/dev/null || { echo 'curl missing' >&2; return 1; }
-      curl --silent --show-error --fail --retry 2 --retry-delay 2 --connect-timeout 5 --max-time 20 \
-        -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-        --data-urlencode "chat_id=$TG_CHAT_ID" \
-        --data-urlencode "text=$subject
+      # A URL argument would expose the bot token via the process command line.
+      # Validate before embedding it in curl's stdin configuration.
+      [[ $TG_BOT_TOKEN =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || { echo 'Invalid Telegram bot token format' >&2; return 1; }
+      printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TG_BOT_TOKEN" |
+        curl --silent --show-error --fail --retry 2 --retry-delay 2 --connect-timeout 5 --max-time 20 \
+          --config - -X POST \
+          --data-urlencode "chat_id=$TG_CHAT_ID" \
+          --data-urlencode "text=$subject
 
 $body" >/dev/null
       ;;
