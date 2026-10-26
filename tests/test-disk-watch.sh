@@ -20,6 +20,9 @@ case "${MOCK_JOURNAL_MODE:-}" in
   clean)
     printf '%s\n' 'Oct 24 00:02:00 test kernel: no errors' '-- cursor: c2'
     ;;
+  error_later)
+    printf '%s\n' 'Oct 24 00:03:00 test kernel: I/O error, dev sdc, sector 99' '-- cursor: c3'
+    ;;
   *) echo 'unexpected journal mode' >&2; exit 2;;
 esac
 MOCK
@@ -31,6 +34,7 @@ printf '%s' "$*" > "$MOCK_CURL_BODY"
 MOCK
 cat > "$TMP/bin/logger" <<'MOCK'
 #!/usr/bin/env bash
+if [[ ${MOCK_LOGGER_FAIL:-0} == 1 ]]; then exit 1; fi
 exit 0
 MOCK
 chmod +x "$TMP/bin/"*
@@ -111,4 +115,13 @@ assert_cursor c2
 [[ $(wc -l < "$TMP/curl.log") -eq 2 ]] || fail 'failed SMART delivery recorded a success'
 unset SMARTD_DEVICE SMARTD_MESSAGE MOCK_CURL_FAIL
 
-echo 'PASS: cursor initialization, retry, missing credentials, error delivery, clean scan, SMART notification and failure'
+# A logger failure after successful delivery must not prevent cursor advancement,
+# otherwise the same event would be sent again on the next timer run.
+export MOCK_JOURNAL_MODE=error_later MOCK_LOGGER_FAIL=1
+if ! bash "$SCRIPT" scan >/dev/null 2>&1; then fail 'logger failure aborted a delivered alert'; fi
+assert_cursor c3
+[[ $(wc -l < "$TMP/curl.log") -eq 3 ]] || fail 'expected one new alert despite logger failure'
+grep -Fq 'I/O error, dev sdc' "$TMP/curl.body" || fail 'missing later I/O error details'
+unset MOCK_LOGGER_FAIL
+
+echo 'PASS: cursor initialization, retry, missing credentials, error delivery, clean scan, SMART notification/failure, logger failure'
