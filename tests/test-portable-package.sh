@@ -10,6 +10,11 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 ARCHIVE="$TMP/portable build.tar.gz"
 (cd "$TMP"; bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE") >/dev/null
 [[ -s "$ARCHIVE" ]] || fail 'archive missing or empty'
+[[ -s "$ARCHIVE.sha256" ]] || fail 'archive checksum missing or empty'
+(cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") >/dev/null ||
+  fail 'checksum verification failed for unmodified archive'
+grep -Fq 'portable build.tar.gz' "$ARCHIVE.sha256" ||
+  fail 'checksum must use a portable basename rather than an absolute path'
 
 # An exact allowlist prevents accidental inclusion of secrets or Git metadata.
 tar -tzf "$ARCHIVE" | grep -v '/$' | sort > "$TMP/actual"
@@ -70,4 +75,10 @@ bash "$PKG/disk-watch.sh" --config "$TMP/private config" --state-dir "$TMP/local
 [[ $(cat "$TMP/local state/kernel.cursor") == p1 ]] || fail 'packaged check did not advance cursor'
 grep -Fq 'I/O error, dev sdb' "$TMP/mail.body" || fail 'packaged check did not alert'
 
-echo 'PASS: portable archive contents and offline init/check smoke test'
+# The checksum must detect corruption, not just exist.
+printf 'tampered' >> "$ARCHIVE"
+if (cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") > /dev/null 2>&1; then
+  fail 'checksum accepted a modified archive'
+fi
+
+echo 'PASS: portable archive allowlist, checksum integrity and offline init/check smoke test'
