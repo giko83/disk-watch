@@ -35,6 +35,8 @@ The installer does not change `/etc/disk-watch.conf`, `/etc/smartd.conf`, or `/v
 
 Run `sudo bash /opt/disk-watch/update.sh` only after review. It executes `git pull --ff-only`, then a read-only `install.sh --preflight` before attempting installation. A preflight failure leaves installed scripts and units unchanged, **but the Git checkout is already updated**; it does not restore the previous commit. Installation failures after preflight can still leave partial changes, so keep backups and verify each host.
 
+The repository also includes `bash tests/test-update.sh`, an **offline unprivileged regression test** for updater control flow. It uses a disposable copy of the updater with only its root guard disabled, plus mocked Git and installer commands. It covers missing/dirty checkouts, failed fast-forward pulls, failed preflight, failed installation and a successful command sequence. **It does not exercise actual root installation, backups, systemd or rollback**, so it is not a substitute for a host-specific recovery plan.
+
 ## Manual rollback of deployed files
 
 If an update fails, first stop further deployments. Restore the backed-up binaries and units from the *same host*:

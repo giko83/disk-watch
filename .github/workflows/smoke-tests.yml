@@ -26,3 +26,4 @@ jobs:
           bash tests/test-portable.sh
           bash tests/test-portable-package.sh
           bash tests/test-install-preflight.sh
+          bash tests/test-update.sh
