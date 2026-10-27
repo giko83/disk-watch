@@ -11,6 +11,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Reject duplicate active `ExecStart=` and timer `Unit=` directives in installer preflight, preventing a valid-looking entry from masking a later conflicting directive; no new runtime dependency.
 - Reject a syntactically valid but misdirected `disk-watch-smart.sh` during read-only installer preflight, preventing silent loss of `smartd` forwarding after an update; add an offline regression without new runtime dependencies.
 - Make installer preflight reject missing or syntactically invalid `update.sh` before replacing installed files; this does not add runtime dependencies or provide automatic rollback.
 - Reject packaged systemd units whose service `ExecStart` or timer `Unit` no longer points to the installed Disk Watch entry points during read-only preflight; no extra runtime dependency or systemctl invocation.
@@ -21,6 +22,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Add offline negative cases for conflicting duplicate systemd service and timer directives; verify preflight never invokes `systemctl`.
 - Add offline negative cases for a missing updater and invalid updater Bash syntax in the read-only installer preflight suite.
 - Exercise preflight rejection of syntactically valid but misdirected service/timer units with offline fixtures, without invoking systemctl.
 - Verify the portable archive checksum, basename portability and rejection of modified archive contents with offline tests.
@@ -34,6 +36,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add a regression test ensuring a missing Telegram bot token fails the disk scan without advancing its journal cursor or contacting Telegram, allowing the pending alert to be retried after configuration is fixed.
 
 ### Documentation
+- Explain duplicate systemd directive detection and the limits of the lightweight preflight in README and operations runbook.
 - Show how to verify the portable source archive before extraction and clarify checksum limitations and the build-only `sha256sum` dependency.
 - Explain installer preflight limitations and safe manual update behavior in README and the operations runbook.
 - Document portable archive build, extraction, configuration isolation and remaining portability limitations.
