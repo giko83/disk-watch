@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Add an opt-in offline restore rehearsal into a private, empty sandbox, re-verifying snapshot integrity and copied file contents/modes without touching installed paths, systemd or host state. This does not provide live rollback.
 - Add a read-only recovery planner for verified pre-install snapshots: list four fixed paths to restore or review without copying, deleting, changing services or touching host state. This is not a root-level rollback or transactional update.
 - Add a read-only pre-install snapshot verifier that checks private ownership/mode, completion marker, fixed-path present/absent manifests, symlinks and SHA-256 integrity before manual restore. It never writes host files or performs rollback; legacy snapshots without hashes are rejected.
 - Add relative-path SHA-256 integrity manifests to newly created pre-install snapshots and verify them before marking a snapshot complete; `sha256sum` is now checked during installer preflight. This detects corruption but is not a signature or automatic rollback; older snapshots have no hashes.
@@ -28,6 +29,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Rehearse verified and empty snapshots offline, preserve copied file modes, and reject damaged snapshots, unsafe or prepopulated sandboxes and missing arguments without touching installed paths.
 - Exercise recovery planning on valid, empty, tampered and space-containing snapshot paths; ensure no plan is emitted for damaged snapshots and no files are changed (offline, no root).
 - Add offline verifier fixtures for valid and empty snapshots, tampered files, duplicate/unknown manifest entries, extra hashes, absent-file conflicts, missing markers, legacy snapshots, public directories and symlinks.
 - Verify snapshot SHA-256 manifests, reject tampered copies, accept an empty new-install snapshot and refuse completion if checksum generation fails (all offline).
@@ -49,6 +51,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add a regression test ensuring a missing Telegram bot token fails the disk scan without advancing its journal cursor or contacting Telegram, allowing the pending alert to be retried after configuration is fixed.
 
 ### Documentation
+- Explain safe sandbox rehearsal, partial-sandbox cleanup and why it does not prove root-level rollback.
 - Document how to generate and interpret the verified recovery checklist before manual restoration, including absent-file safety and unverified root-level rollback limitations.
 - Document read-only snapshot verification before manual restore, prerequisites and remaining root-level rollback limitations.
 - Document manual checksum verification before recovery, legacy snapshot limitations and the GNU coreutils `sha256sum` installer requirement.

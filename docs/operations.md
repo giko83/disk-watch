@@ -86,6 +86,20 @@ The planner first runs the strict snapshot verifier and **fails without emitting
 
 The planner is intentionally read-only: it does not copy, remove, `chmod`, run `systemctl`, change config/cursors, or roll back Git. It needs Bash and standard GNU Linux tools (`stat`, `sha256sum`, `grep`), not smartctl or network access. Its offline tests verify valid, empty, tampered and quoted-path snapshots. This is a checklist, **not** proof of root-level recovery or a transactional updater.
 
+### Offline restore rehearsal (sandbox only)
+
+Before attempting manual recovery, you can rehearse file copying into a **new empty private directory**. This detects a broken or unreadable backup without writing to installed paths:
+
+```sh
+SNAPSHOT=/var/lib/disk-watch/backups/backup.REPLACE_WITH_EXACT_NAME
+SANDBOX=$(sudo mktemp -d /tmp/disk-watch-rehearsal.XXXXXXXX)
+sudo bash /opt/disk-watch/scripts/rehearse-installed-restore.sh "$SNAPSHOT" "$SANDBOX"
+sudo find "$SANDBOX" -type f -print
+# After reviewing copied files, remove this disposable sandbox manually.
+```
+
+The rehearsal verifies the snapshot first, requires a pre-existing empty mode `700` sandbox owned by the invoking user, and copies only allowlisted saved files into sandbox-prefixed paths while checking contents and modes. It never touches live installed paths, removes absent files, invokes systemd, changes Git, or changes private configuration/state. An invalid snapshot or unsafe sandbox fails before any copy; a copy failure may leave **partial sandbox files** requiring manual cleanup. The sandbox can contain historical executable code; do not execute it. This is an **offline regression-tested rehearsal**, not a verified root-level restore or transactional rollback. Root-level systemd and failure recovery remain untested.
+
 For manual recovery, restore **only paths listed in `present.txt`** from the matching paths inside that completed snapshot, using the same-host rollback procedure below. For example, if the monitor script is listed:
 
 ```sh

@@ -122,4 +122,54 @@ if bash "$ROOT/scripts/plan-installed-restore.sh" > "$TMP/out" 2> "$TMP/err"; th
 fi
 grep -Fq 'Usage:' "$TMP/err" || fail 'missing recovery-plan usage diagnostic'
 
-echo 'PASS: offline read-only snapshot verification, recovery planning and malformed/tampered/legacy rejection'
+
+# Rehearse only into a private empty sandbox; never touch installed host paths.
+rehearse() { bash "$ROOT/scripts/rehearse-installed-restore.sh" "$1" "$2"; }
+mkdir -m 700 "$TMP/rehearsal"
+rehearse "$TMP/backups/valid" "$TMP/rehearsal" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'valid sandbox rehearsal rejected'
+cmp -s "$TMP/backups/valid$script" "$TMP/rehearsal$script" ||
+  fail 'rehearsed monitor contents differ'
+cmp -s "$TMP/backups/valid$unit" "$TMP/rehearsal$unit" ||
+  fail 'rehearsed unit contents differ'
+[[ $(stat -c %a "$TMP/rehearsal$script") == $(stat -c %a "$TMP/backups/valid$script") ]] ||
+  fail 'rehearsal did not preserve file mode'
+[[ ! -e "$TMP/rehearsal$missing" ]] ||
+  fail 'rehearsal unexpectedly created an absent file'
+grep -Fq 'No live paths or services changed.' "$TMP/out" ||
+  fail 'rehearsal missing live-host safety diagnostic'
+
+mkdir -m 700 "$TMP/empty rehearsal"
+rehearse "$TMP/backups/empty" "$TMP/empty rehearsal" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'empty snapshot rehearsal rejected'
+[[ -z $(find "$TMP/empty rehearsal" -mindepth 1 -print -quit) ]] ||
+  fail 'empty snapshot created sandbox files'
+
+mkdir -m 700 "$TMP/reject-tampered"
+if rehearse "$TMP/backups/tampered" "$TMP/reject-tampered" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'tampered snapshot was rehearsed'
+fi
+[[ -z $(find "$TMP/reject-tampered" -mindepth 1 -print -quit) ]] ||
+  fail 'tampered snapshot modified sandbox'
+
+mkdir -m 700 "$TMP/reject-nonempty"
+printf 'keep\n' > "$TMP/reject-nonempty/.hidden"
+if rehearse "$TMP/backups/valid" "$TMP/reject-nonempty" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'nonempty sandbox accepted'
+fi
+grep -Fxq 'keep' "$TMP/reject-nonempty/.hidden" ||
+  fail 'nonempty sandbox file modified'
+
+mkdir -m 755 "$TMP/reject-public"
+if rehearse "$TMP/backups/valid" "$TMP/reject-public" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'public sandbox accepted'
+fi
+if rehearse "$TMP/backups/valid" "$TMP/backups/valid" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'snapshot directory accepted as sandbox'
+fi
+if bash "$ROOT/scripts/rehearse-installed-restore.sh" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing rehearsal arguments accepted'
+fi
+grep -Fq 'Usage:' "$TMP/err" || fail 'missing rehearsal usage diagnostic'
+
+echo 'PASS: offline snapshot verification, recovery planning, private sandbox rehearsal and rejection cases'
