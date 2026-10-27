@@ -22,6 +22,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Add unprivileged offline updater control-flow regression coverage with mocked Git and installer: missing/dirty checkout, failed fast-forward pull, failed preflight, failed install and successful ordered update. CI runs the suite; no real Git pull, installation or network is performed.
 - Add offline negative cases for conflicting duplicate systemd service and timer directives; verify preflight never invokes `systemctl`.
 - Add offline negative cases for a missing updater and invalid updater Bash syntax in the read-only installer preflight suite.
 - Exercise preflight rejection of syntactically valid but misdirected service/timer units with offline fixtures, without invoking systemctl.
