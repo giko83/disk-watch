@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Add relative-path SHA-256 integrity manifests to newly created pre-install snapshots and verify them before marking a snapshot complete; `sha256sum` is now checked during installer preflight. This detects corruption but is not a signature or automatic rollback; older snapshots have no hashes.
 - Before replacing installed files, the root installer now creates a timestamped, private pre-install snapshot of existing Disk Watch scripts and systemd units with present/absent manifests and a final completion marker. Backup errors abort installation; there is still no automatic rollback or backup pruning. No config, credentials or cursor are copied.
 - Generate a portable archive SHA-256 checksum sidecar with a relative filename, allowing offline integrity verification even when the archive and checksum are moved together. The checksum is not an authenticity signature and adds no runtime dependency.
 - Add a read-only, unprivileged `install.sh --preflight` command that checks required files, Bash/POSIX shell syntax and core commands before deployment. The updater invokes it after `git pull --ff-only` and before installing files; it is not a rollback mechanism.
@@ -25,6 +26,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Verify snapshot SHA-256 manifests, reject tampered copies, accept an empty new-install snapshot and refuse completion if checksum generation fails (all offline).
 - Extend offline snapshot regression coverage for world-readable and prepopulated (hidden-entry) backup directories, confirming that neither is marked complete or overwritten.
 - Extend offline installer preflight tests to require the config checker and verify root ownership, restrictive modes, malformed metadata, missing files and symlink rejection using mocked `stat`, without accessing host config or invoking systemd.
 - Add offline snapshot regression tests for preserved content/modes, missing-file manifests, refusal to reuse a completed snapshot, symlink rejection and copy failure; extend installer preflight tests to reject a missing or syntactically invalid backup helper.
@@ -43,6 +45,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add a regression test ensuring a missing Telegram bot token fails the disk scan without advancing its journal cursor or contacting Telegram, allowing the pending alert to be retried after configuration is fixed.
 
 ### Documentation
+- Document manual checksum verification before recovery, legacy snapshot limitations and the GNU coreutils `sha256sum` installer requirement.
 - Explain versioned pre-install snapshots, how to inspect a completed manifest and limitations of manual recovery in README and the operations runbook.
 - Explain duplicate systemd directive detection and the limits of the lightweight preflight in README and operations runbook.
 - Show how to verify the portable source archive before extraction and clarify checksum limitations and the build-only `sha256sum` dependency.
