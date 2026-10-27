@@ -74,6 +74,25 @@ grep -Fq 'does not target disk-watch.service' "$TMP/err" ||
 sed -i 's/Unit=other.service/Unit=disk-watch.service/' "$TMP/source/disk-watch.timer"
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'unit validation invoked systemctl'
 
+# A valid entry followed by another active entry must not pass preflight.
+# A simple grep -Fxq would accept the first line despite a later override.
+printf '\nExecStart=/bin/false\n' >> "$TMP/source/disk-watch.service"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'duplicate service ExecStart passed preflight'
+fi
+grep -Fq 'duplicate or missing ExecStart directives' "$TMP/err" ||
+  fail 'duplicate service directive diagnostic absent'
+cp "$ROOT/disk-watch.service" "$TMP/source/disk-watch.service"
+
+printf '\nUnit=other.service\n' >> "$TMP/source/disk-watch.timer"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'duplicate timer Unit passed preflight'
+fi
+grep -Fq 'duplicate or missing Unit directives' "$TMP/err" ||
+  fail 'duplicate timer directive diagnostic absent'
+cp "$ROOT/disk-watch.timer" "$TMP/source/disk-watch.timer"
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'duplicate directive validation invoked systemctl'
+
 # A syntactically valid SMART adapter targeting another command must fail.
 # This prevents a successful install with silently broken smartd forwarding.
 sed -i 's@exec /usr/local/sbin/disk-watch.sh smart@exec /bin/true@' "$TMP/source/disk-watch-smart.sh"
