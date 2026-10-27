@@ -46,7 +46,7 @@ A snapshot contains only previous versions of these four paths (if present): `/u
 To inspect a snapshot as root, choose its exact directory and verify completion:
 
 ```sh
-sudo ls -ld /var/lib/disk-watch/backups/backup.*
+sudo find /var/lib/disk-watch/backups -maxdepth 1 -type d -name 'backup.*' -print
 # Replace the placeholder with one existing directory from the listing.
 SNAPSHOT=/var/lib/disk-watch/backups/backup.REPLACE_WITH_EXACT_NAME
 sudo test -f "$SNAPSHOT/.complete"
