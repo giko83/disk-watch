@@ -12,7 +12,7 @@ mkdir -p "$TMP/source" "$TMP/mock-bin"
 cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
    "$ROOT/disk-watch.service" "$ROOT/disk-watch.timer" "$TMP/source/"
 mkdir -p "$TMP/source/scripts"
-cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/"
+cp "$ROOT/scripts/backup-installed.sh" "$ROOT/scripts/check-config.sh" "$TMP/source/scripts/"
 
 # If the preflight ever calls systemctl rather than just checking availability,
 # the mock leaves a detectable marker and fails.
@@ -65,6 +65,22 @@ fi
 grep -Fq 'invalid Bash syntax' "$TMP/err" ||
   fail 'invalid backup helper diagnostic absent'
 cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/backup-installed.sh"
+
+# A missing or broken config metadata checker must block deployment preflight.
+mv "$TMP/source/scripts/check-config.sh" "$TMP/missing-config-check"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing config checker passed preflight'
+fi
+grep -Fq 'missing or empty scripts/check-config.sh' "$TMP/err" ||
+  fail 'missing config checker diagnostic absent'
+mv "$TMP/missing-config-check" "$TMP/source/scripts/check-config.sh"
+printf '%s\n' 'if then' >> "$TMP/source/scripts/check-config.sh"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'broken config checker syntax passed preflight'
+fi
+grep -Fq 'invalid Bash syntax' "$TMP/err" ||
+  fail 'invalid config checker diagnostic absent'
+cp "$ROOT/scripts/check-config.sh" "$TMP/source/scripts/check-config.sh"
 
 # Reject broken updater syntax before replacing installed files.
 printf '%s\n' 'if then' >> "$TMP/source/update.sh"
@@ -137,4 +153,48 @@ fi
 grep -Fq 'Usage:' "$TMP/err" || fail 'invalid option diagnostic absent'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight or argument error invoked systemctl'
 
-echo 'PASS: read-only installer preflight, updater and backup validation, unit and SMART adapter checks, invalid syntax and options'
+# Root-owned configuration validation is isolated from the host and tested
+# with a mocked GNU stat: no root access or real /etc file is needed.
+printf '%s\n' 'HOST_LABEL=test' > "$TMP/host-config"
+chmod 600 "$TMP/host-config"
+cat > "$TMP/mock-bin/stat" <<'MOCK'
+#!/usr/bin/env bash
+case "${2:-}" in
+  %u) printf '%s\n' "${MOCK_STAT_UID:-0}" ;;
+  %a) printf '%s\n' "${MOCK_STAT_MODE:-600}" ;;
+  *) exit 2 ;;
+esac
+MOCK
+chmod +x "$TMP/mock-bin/stat"
+check="$TMP/source/scripts/check-config.sh"
+MOCK_STAT_UID=0 MOCK_STAT_MODE=600 bash "$check" "$TMP/host-config" ||
+  fail 'secure root-owned mode 600 rejected'
+MOCK_STAT_UID=0 MOCK_STAT_MODE=400 bash "$check" "$TMP/host-config" ||
+  fail 'secure root-owned read-only mode 400 rejected'
+if MOCK_STAT_UID=1000 MOCK_STAT_MODE=600 bash "$check" "$TMP/host-config" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'non-root-owned config accepted'
+fi
+grep -Fq 'owned by root' "$TMP/err" || fail 'missing ownership diagnostic'
+for mode in 640 644 777; do
+  if MOCK_STAT_UID=0 MOCK_STAT_MODE="$mode" bash "$check" "$TMP/host-config" > "$TMP/out" 2> "$TMP/err"; then
+    fail "insecure config mode $mode accepted"
+  fi
+  grep -Fq 'must not be accessible to group or others' "$TMP/err" ||
+    fail "missing permissions diagnostic for mode $mode"
+done
+if MOCK_STAT_UID=0 MOCK_STAT_MODE=garbled bash "$check" "$TMP/host-config" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'malformed stat mode accepted'
+fi
+ln -s "$TMP/host-config" "$TMP/config-link"
+if bash "$check" "$TMP/config-link" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'symlink config accepted'
+fi
+if bash "$check" "$TMP/no-such-config" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing config accepted'
+fi
+if bash "$check" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'config checker without path accepted'
+fi
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'config checker invoked systemctl'
+
+echo 'PASS: installer preflight and isolated root-config metadata guard, including unsafe modes and symlinks'
