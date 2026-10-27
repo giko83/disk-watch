@@ -64,5 +64,20 @@ for src in "$@"; do
     printf '%s\n' "$src" >> "$backup_dir/absent.txt"
   fi
 done
+# Record relative checksums so a completed snapshot can be checked after it
+# is moved. A checksum detects accidental damage, not malicious modification
+# by an account able to rewrite both the snapshot and its manifest.
+(
+  cd -- "$backup_dir"
+  : > SHA256SUMS
+  while IFS= read -r src; do
+    sha256sum -- ".${src}" >> SHA256SUMS
+  done < present.txt
+  # An initial install can have no previous files. An empty checksum manifest
+  # is valid in that case, but sha256sum -c rejects an empty input.
+  if [[ -s present.txt ]]; then
+    sha256sum --status -c SHA256SUMS
+  fi
+)
 # This marker is written last. An incomplete snapshot must never be restored.
 printf 'complete\n' > "$backup_dir/.complete"
