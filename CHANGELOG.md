@@ -25,6 +25,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Extend offline snapshot regression coverage for world-readable and prepopulated (hidden-entry) backup directories, confirming that neither is marked complete or overwritten.
 - Extend offline installer preflight tests to require the config checker and verify root ownership, restrictive modes, malformed metadata, missing files and symlink rejection using mocked `stat`, without accessing host config or invoking systemd.
 - Add offline snapshot regression tests for preserved content/modes, missing-file manifests, refusal to reuse a completed snapshot, symlink rejection and copy failure; extend installer preflight tests to reject a missing or syntactically invalid backup helper.
 - Add unprivileged offline updater control-flow regression coverage with mocked Git and installer: missing/dirty checkout, failed fast-forward pull, failed preflight, failed install and successful ordered update. CI runs the suite; no real Git pull, installation or network is performed.
