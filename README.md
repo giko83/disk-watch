@@ -13,7 +13,7 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 ## Requirements
 
-Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock`, GNU `stat` and standard utilities. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
+Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock` and standard utilities. The **root installer** additionally requires GNU `stat` (coreutils) to check configuration metadata; standalone one-shot monitoring does not. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
 
 ## Portable one-shot use (no installation)
 
