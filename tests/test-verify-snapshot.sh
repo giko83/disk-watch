@@ -92,9 +92,9 @@ plan() { bash "$ROOT/scripts/plan-installed-restore.sh" "$1"; }
 before=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
 plan "$TMP/backups/valid" > "$TMP/out" 2> "$TMP/err" ||
   fail 'valid recovery plan rejected'
-grep -Fxq "RESTORE: $script (saved file mode 644)" "$TMP/out" ||
+grep -Fxq "RESTORE: $script (saved file mode $(stat -c %a "$TMP/backups/valid$script"))" "$TMP/out" ||
   fail 'restore plan did not list previous monitor'
-grep -Fxq "RESTORE: $unit (saved file mode 644)" "$TMP/out" ||
+grep -Fxq "RESTORE: $unit (saved file mode $(stat -c %a "$TMP/backups/valid$unit"))" "$TMP/out" ||
   fail 'restore plan did not list previous unit'
 grep -Fxq "REVIEW ABSENT: $missing (do not delete automatically)" "$TMP/out" ||
   fail 'restore plan did not flag absent timer for human review'
