@@ -16,11 +16,11 @@ cd "$(dirname "$0")"
 # Read-only checks; safe to run as an unprivileged user before deploying.
 preflight() {
   local file cmd
-  for file in disk-watch.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer; do
+  for file in disk-watch.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
   done
 
-  (bash -n disk-watch.sh && bash -n install.sh && bash -n update.sh) || {
+  (bash -n disk-watch.sh && bash -n install.sh && bash -n update.sh && bash -n scripts/backup-installed.sh) || {
     echo 'Preflight failed: invalid Bash syntax' >&2
     return 1
   }
@@ -31,7 +31,7 @@ preflight() {
 
   # Core runtime and deployment tools only. curl/sendmail/smartctl are optional
   # and depend on the selected notification and SMART integrations.
-  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname; do
+  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date; do
     command -v "$cmd" >/dev/null 2>&1 || {
       echo "Preflight failed: required command not found: $cmd" >&2
       return 1
@@ -80,6 +80,22 @@ fi
 [[ ${EUID} -eq 0 ]] || { echo 'Run with sudo' >&2; exit 1; }
 preflight
 test -s /etc/disk-watch.conf || { echo 'Create /etc/disk-watch.conf first; see README' >&2; exit 1; }
+
+# Create a unique, root-private snapshot before replacing ANY installed files.
+# Never copy host configuration, credentials, SMART rules or the journal cursor.
+# Failed snapshots abort installation; a .complete marker is written last.
+BACKUP_ROOT=/var/lib/disk-watch/backups
+install -d -m 700 -- "$BACKUP_ROOT"
+backup_dir=$(mktemp -d "$BACKUP_ROOT/backup.$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
+if ! bash ./scripts/backup-installed.sh "$backup_dir" \
+  /usr/local/sbin/disk-watch.sh \
+  /usr/local/sbin/disk-watch-smart.sh \
+  /etc/systemd/system/disk-watch.service \
+  /etc/systemd/system/disk-watch.timer; then
+  echo "Backup failed; no installed files replaced. Incomplete snapshot: $backup_dir" >&2
+  exit 1
+fi
+echo "Pre-install snapshot saved: $backup_dir"
 
 install -m 750 disk-watch.sh disk-watch-smart.sh /usr/local/sbin/
 install -m 644 disk-watch.service disk-watch.timer /etc/systemd/system/
