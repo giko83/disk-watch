@@ -145,6 +145,29 @@ rehearse "$TMP/backups/empty" "$TMP/empty rehearsal" > "$TMP/out" 2> "$TMP/err" 
 [[ -z $(find "$TMP/empty rehearsal" -mindepth 1 -print -quit) ]] ||
   fail 'empty snapshot created sandbox files'
 
+# A private empty sandbox must not be inside the snapshot being verified.
+# Resolve parent symlinks too, so aliases cannot bypass the isolation guard.
+mkdir -m 700 "$TMP/backups/valid/nested-sandbox"
+before_nested=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+if rehearse "$TMP/backups/valid" "$TMP/backups/valid/nested-sandbox" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'sandbox nested in snapshot was accepted'
+fi
+grep -Fq 'sandbox must be outside the snapshot directory' "$TMP/err" ||
+  fail 'nested sandbox rejection lacked diagnostic'
+[[ -z $(find "$TMP/backups/valid/nested-sandbox" -mindepth 1 -print -quit) ]] ||
+  fail 'nested sandbox was written to'
+ln -s "$TMP/backups/valid" "$TMP/snapshot-alias"
+mkdir -m 700 "$TMP/backups/valid/alias-sandbox"
+if rehearse "$TMP/backups/valid" "$TMP/snapshot-alias/alias-sandbox" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'symlink-aliased nested sandbox was accepted'
+fi
+grep -Fq 'sandbox must be outside the snapshot directory' "$TMP/err" ||
+  fail 'aliased nested sandbox rejection lacked diagnostic'
+[[ -z $(find "$TMP/backups/valid/alias-sandbox" -mindepth 1 -print -quit) ]] ||
+  fail 'aliased nested sandbox was written to'
+[[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_nested" ]] ||
+  fail 'nested rehearsal modified source snapshot files'
+
 mkdir -m 700 "$TMP/reject-tampered"
 if rehearse "$TMP/backups/tampered" "$TMP/reject-tampered" > "$TMP/out" 2> "$TMP/err"; then
   fail 'tampered snapshot was rehearsed'
