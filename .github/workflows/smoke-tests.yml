@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Bash syntax
         run: |
-          for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh tests/*.sh; do
+          for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/verify-installed-snapshot.sh tests/*.sh; do
             bash -n "$script"
           done
           sh -n disk-watch-smart.sh
@@ -27,4 +27,5 @@ jobs:
           bash tests/test-portable-package.sh
           bash tests/test-install-preflight.sh
           bash tests/test-backup.sh
+          bash tests/test-verify-snapshot.sh
           bash tests/test-update.sh
