@@ -87,4 +87,39 @@ printf 'complete\n' > "$TMP/backups/empty/.complete"
 verify "$TMP/backups/empty" > "$TMP/out" || fail 'valid empty snapshot rejected'
 grep -Fq '0 present, 4 absent' "$TMP/out" || fail 'wrong empty summary'
 
-echo 'PASS: offline read-only snapshot verification and malformed/tampered/legacy rejection'
+# A recovery plan is read-only and only describes the four allowlisted paths.
+plan() { bash "$ROOT/scripts/plan-installed-restore.sh" "$1"; }
+before=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+plan "$TMP/backups/valid" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'valid recovery plan rejected'
+grep -Fxq "RESTORE: $script (saved file mode $(stat -c %a "$TMP/backups/valid$script"))" "$TMP/out" ||
+  fail 'restore plan did not list previous monitor'
+grep -Fxq "RESTORE: $unit (saved file mode $(stat -c %a "$TMP/backups/valid$unit"))" "$TMP/out" ||
+  fail 'restore plan did not list previous unit'
+grep -Fxq "REVIEW ABSENT: $missing (do not delete automatically)" "$TMP/out" ||
+  fail 'restore plan did not flag absent timer for human review'
+grep -Fq 'No files, services, configuration, or state were changed.' "$TMP/out" ||
+  fail 'restore plan lacks no-write warning'
+[[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before" ]] ||
+  fail 'recovery plan modified snapshot contents'
+
+# Quoted paths and empty snapshots must be supported without any deletion.
+cp -a -- "$TMP/backups/valid" "$TMP/backups/valid with spaces"
+plan "$TMP/backups/valid with spaces" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'snapshot path with spaces rejected'
+plan "$TMP/backups/empty" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'empty snapshot recovery plan rejected'
+[[ $(grep -c '^REVIEW ABSENT:' "$TMP/out") == 4 ]] ||
+  fail 'empty snapshot should list four review-only absent files'
+if plan "$TMP/backups/tampered" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'tampered snapshot received a recovery plan'
+fi
+[[ ! -s "$TMP/out" ]] || fail 'unverified snapshot emitted a recovery plan'
+grep -Fq 'Snapshot verification failed:' "$TMP/err" ||
+  fail 'missing integrity rejection from recovery plan'
+if bash "$ROOT/scripts/plan-installed-restore.sh" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing snapshot argument accepted'
+fi
+grep -Fq 'Usage:' "$TMP/err" || fail 'missing recovery-plan usage diagnostic'
+
+echo 'PASS: offline read-only snapshot verification, recovery planning and malformed/tampered/legacy rejection'

@@ -73,6 +73,19 @@ It checks that the snapshot is private and owned by the invoking user, the compl
 A nonzero exit means **stop and investigate**; do not restore damaged files. Older snapshots created before checksum support have no `SHA256SUMS` and cannot pass this verification; inspect their contents and origin separately rather than treating a missing manifest as valid. SHA-256 protects against accidental corruption, **not** against an attacker able to rewrite both backup files and checksums. This check does not provide automatic rollback or prove real root-level recovery.
 
 
+### Read-only recovery plan (no restore)
+
+After selecting a completed snapshot, generate an explicit recovery checklist **before** touching any installed file:
+
+```sh
+SNAPSHOT=/var/lib/disk-watch/backups/backup.REPLACE_WITH_EXACT_NAME
+sudo bash /opt/disk-watch/scripts/plan-installed-restore.sh "$SNAPSHOT"
+```
+
+The planner first runs the strict snapshot verifier and **fails without emitting a plan** if the snapshot is incomplete, tampered, legacy or unsafe. It then lists exactly four allowlisted installed paths: `RESTORE` means a previous file is available (with its saved file mode); `REVIEW ABSENT` means the file did not exist when the snapshot was taken. **Do not automatically delete an absent entry**: investigate whether it was created by this installation and whether another service uses it. A snapshot path containing spaces is supported.
+
+The planner is intentionally read-only: it does not copy, remove, `chmod`, run `systemctl`, change config/cursors, or roll back Git. It needs Bash and standard GNU Linux tools (`stat`, `sha256sum`, `grep`), not smartctl or network access. Its offline tests verify valid, empty, tampered and quoted-path snapshots. This is a checklist, **not** proof of root-level recovery or a transactional updater.
+
 For manual recovery, restore **only paths listed in `present.txt`** from the matching paths inside that completed snapshot, using the same-host rollback procedure below. For example, if the monitor script is listed:
 
 ```sh
