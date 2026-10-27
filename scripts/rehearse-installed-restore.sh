@@ -27,6 +27,13 @@ script_dir=$(cd -- "$(dirname -- "$0")" && pwd -P)
 # Verify the entire snapshot before creating even a sandbox subdirectory.
 bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2
 
+# Refuse a sandbox inside its source snapshot, including aliases through
+# symlinked parent directories. Never write rehearsal output into a backup.
+snapshot_real=$(cd -- "$snapshot" && pwd -P) || fail 'cannot resolve snapshot directory'
+sandbox_real=$(cd -- "$sandbox" && pwd -P) || fail 'cannot resolve sandbox directory'
+[[ $sandbox_real != "$snapshot_real" && $sandbox_real != "$snapshot_real"/* ]] ||
+  fail 'sandbox must be outside the snapshot directory'
+
 count=0
 for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-smart.sh \
             /etc/systemd/system/disk-watch.service /etc/systemd/system/disk-watch.timer; do

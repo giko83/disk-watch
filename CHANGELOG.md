@@ -16,6 +16,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Reject offline restore rehearsal destinations nested inside the source snapshot (including symlinked parent aliases) before any copy, preserving backup isolation without adding dependencies or touching live paths.
 - Reject pre-install snapshot destinations that are not owned by the invoking user, not mode `700`, or not empty (including hidden files), before writing manifests or copies. This adds no new runtime dependency beyond the already required GNU `stat` and does not provide automatic rollback.
 - Refuse root installation when `/etc/disk-watch.conf` is a symlink, not root-owned or group/world-accessible; the guard checks metadata before snapshots or replacement, without reading secrets or modifying permissions. Existing `640` configs need manual tightening; no new service or database.
 - Reject duplicate active `ExecStart=` and timer `Unit=` directives in installer preflight, preventing a valid-looking entry from masking a later conflicting directive; no new runtime dependency.
@@ -29,6 +30,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Cover direct and symlink-aliased nested rehearsal sandboxes, asserting clear rejection and unchanged snapshot contents with offline fixtures.
 - Rehearse verified and empty snapshots offline, preserve copied file modes, and reject damaged snapshots, unsafe or prepopulated sandboxes and missing arguments without touching installed paths.
 - Exercise recovery planning on valid, empty, tampered and space-containing snapshot paths; ensure no plan is emitted for damaged snapshots and no files are changed (offline, no root).
 - Add offline verifier fixtures for valid and empty snapshots, tampered files, duplicate/unknown manifest entries, extra hashes, absent-file conflicts, missing markers, legacy snapshots, public directories and symlinks.
@@ -51,6 +53,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add a regression test ensuring a missing Telegram bot token fails the disk scan without advancing its journal cursor or contacting Telegram, allowing the pending alert to be retried after configuration is fixed.
 
 ### Documentation
+- Explain why the offline restore rehearsal must use a sandbox outside the source snapshot, even when paths use symlinked parents.
 - Explain safe sandbox rehearsal, partial-sandbox cleanup and why it does not prove root-level rollback.
 - Document how to generate and interpret the verified recovery checklist before manual restoration, including absent-file safety and unverified root-level rollback limitations.
 - Document read-only snapshot verification before manual restore, prerequisites and remaining root-level rollback limitations.
