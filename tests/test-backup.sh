@@ -35,6 +35,24 @@ fi
 grep -Fq 'expected a new private backup directory' "$TMP/err" ||
   fail 'missing completed snapshot diagnostic'
 
+# A manually supplied snapshot directory must not be world-readable or
+# prepopulated (including hidden entries). Neither rejection may write files.
+mkdir -m 755 "$TMP/backups/backup.public"
+if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.public" "$script" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'public snapshot directory accepted'
+fi
+grep -Fq 'mode 700' "$TMP/err" || fail 'missing private-directory diagnostic'
+[[ ! -e "$TMP/backups/backup.public/.complete" ]] || fail 'public snapshot marked complete'
+
+mkdir -m 700 "$TMP/backups/backup.notempty"
+printf 'keep me\\n' > "$TMP/backups/backup.notempty/.hidden"
+if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.notempty" "$script" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'prepopulated snapshot directory accepted'
+fi
+grep -Fq 'must be empty' "$TMP/err" || fail 'missing non-empty-directory diagnostic'
+grep -Fq 'keep me' "$TMP/backups/backup.notempty/.hidden" || fail 'preexisting file was overwritten'
+[[ ! -e "$TMP/backups/backup.notempty/.complete" ]] || fail 'non-empty snapshot marked complete'
+
 ln -s "$script" "$TMP/live/linked"
 mkdir -m 700 "$TMP/backups/backup.symlink"
 if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.symlink" "$TMP/live/linked" > "$TMP/out" 2> "$TMP/err"; then
