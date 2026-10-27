@@ -12,6 +12,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Refuse root installation when `/etc/disk-watch.conf` is a symlink, not root-owned or group/world-accessible; the guard checks metadata before snapshots or replacement, without reading secrets or modifying permissions. Existing `640` configs need manual tightening; no new service or database.
 - Reject duplicate active `ExecStart=` and timer `Unit=` directives in installer preflight, preventing a valid-looking entry from masking a later conflicting directive; no new runtime dependency.
 - Reject a syntactically valid but misdirected `disk-watch-smart.sh` during read-only installer preflight, preventing silent loss of `smartd` forwarding after an update; add an offline regression without new runtime dependencies.
 - Make installer preflight reject missing or syntactically invalid `update.sh` before replacing installed files; this does not add runtime dependencies or provide automatic rollback.
@@ -23,6 +24,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Extend offline installer preflight tests to require the config checker and verify root ownership, restrictive modes, malformed metadata, missing files and symlink rejection using mocked `stat`, without accessing host config or invoking systemd.
 - Add offline snapshot regression tests for preserved content/modes, missing-file manifests, refusal to reuse a completed snapshot, symlink rejection and copy failure; extend installer preflight tests to reject a missing or syntactically invalid backup helper.
 - Add unprivileged offline updater control-flow regression coverage with mocked Git and installer: missing/dirty checkout, failed fast-forward pull, failed preflight, failed install and successful ordered update. CI runs the suite; no real Git pull, installation or network is performed.
 - Add offline negative cases for conflicting duplicate systemd service and timer directives; verify preflight never invokes `systemctl`.
