@@ -50,6 +50,18 @@ preflight() {
     return 1
   }
 
+  # A matching line alone is insufficient: systemd may honor another active
+  # directive later in the file. The shipped units use exactly one of each.
+  # This is deliberately a narrow guard, not a full systemd unit parser.
+  [[ $(grep -Ec '^[[:space:]]*ExecStart[[:space:]]*=' disk-watch.service) == 1 ]] || {
+    echo 'Preflight failed: disk-watch.service has duplicate or missing ExecStart directives' >&2
+    return 1
+  }
+  [[ $(grep -Ec '^[[:space:]]*Unit[[:space:]]*=' disk-watch.timer) == 1 ]] || {
+    echo 'Preflight failed: disk-watch.timer has duplicate or missing Unit directives' >&2
+    return 1
+  }
+
   # smartd invokes this adapter without positional arguments. Validate the
   # fixed installed target so a valid but misdirected adapter cannot silently
   # drop SMART notifications after an upgrade.
