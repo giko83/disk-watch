@@ -49,6 +49,14 @@ preflight() {
     echo 'Preflight failed: disk-watch.timer does not target disk-watch.service' >&2
     return 1
   }
+
+  # smartd invokes this adapter without positional arguments. Validate the
+  # fixed installed target so a valid but misdirected adapter cannot silently
+  # drop SMART notifications after an upgrade.
+  grep -Fxq 'exec /usr/local/sbin/disk-watch.sh smart' disk-watch-smart.sh || {
+    echo 'Preflight failed: disk-watch-smart.sh does not forward to the installed SMART handler' >&2
+    return 1
+  }
 }
 
 if [[ ${1:-} == --preflight ]]; then

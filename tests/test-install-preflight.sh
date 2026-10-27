@@ -74,6 +74,17 @@ grep -Fq 'does not target disk-watch.service' "$TMP/err" ||
 sed -i 's/Unit=other.service/Unit=disk-watch.service/' "$TMP/source/disk-watch.timer"
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'unit validation invoked systemctl'
 
+# A syntactically valid SMART adapter targeting another command must fail.
+# This prevents a successful install with silently broken smartd forwarding.
+sed -i 's@exec /usr/local/sbin/disk-watch.sh smart@exec /bin/true@' "$TMP/source/disk-watch-smart.sh"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'mismatched SMART adapter passed preflight'
+fi
+grep -Fq 'does not forward to the installed SMART handler' "$TMP/err" ||
+  fail 'missing SMART adapter diagnostic'
+cp "$ROOT/disk-watch-smart.sh" "$TMP/source/disk-watch-smart.sh"
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'SMART adapter validation invoked systemctl'
+
 printf '\nif then\n' >> "$TMP/source/disk-watch.sh"
 if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
   fail 'broken Bash syntax passed preflight'
@@ -87,4 +98,4 @@ fi
 grep -Fq 'Usage:' "$TMP/err" || fail 'invalid option diagnostic absent'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight or argument error invoked systemctl'
 
-echo 'PASS: read-only installer preflight, updater validation, unit checks, invalid syntax and options'
+echo 'PASS: read-only installer preflight, updater validation, unit and SMART adapter checks, invalid syntax and options'
