@@ -13,7 +13,7 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 ## Requirements
 
-Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock` and standard utilities. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
+Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock` and standard utilities. The **root installer** additionally requires GNU `stat` (coreutils) to check configuration metadata; standalone one-shot monitoring does not. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.
 
 ## Portable one-shot use (no installation)
 
@@ -60,6 +60,8 @@ bash /opt/disk-watch/install.sh --preflight
 ```
 
 It checks required source/unit files (including the updater), Bash syntax for the monitor, installer and updater, core command availability, the backup helper, and the packaged service/timer entry points (`ExecStart` and `Unit`) plus the SMART adapter's installed `smart` handler target, without installing or contacting any disk. These checks also reject duplicate active `ExecStart=` or timer `Unit=` directives that could override the expected entries. They are exact checks for the shipped unit files, **not** full systemd unit validation. It does **not** validate the live notification transport, systemd runtime, or permissions; keep the backup and post-install checks described in the [operations runbook](docs/operations.md).
+
+**Root-install configuration guard:** the actual installer (not the read-only `--preflight`) now refuses `/etc/disk-watch.conf` if it is a symlink, not a regular file, not owned by UID 0, or accessible to group/other users. Before updating, check `sudo stat -c '%u %a %n' /etc/disk-watch.conf`; if needed, correct ownership and permissions with `sudo chown root:root /etc/disk-watch.conf` and `sudo chmod 600 /etc/disk-watch.conf`. A root-owned mode `400` also passes. This guard does not read or display secrets, does not change the config, and runs **before** snapshots or file replacement. Existing installations using group-readable mode `640` must be tightened manually before an update; there is no automatic chmod. See [operations](docs/operations.md).
 
 Install the scripts and systemd units:
 
