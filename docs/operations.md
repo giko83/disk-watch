@@ -62,6 +62,14 @@ For snapshots created with this feature, **verify checksums before any restore**
 sudo sh -c 'cd "$1" || exit; if [ -s present.txt ]; then sha256sum -c SHA256SUMS; else test -f SHA256SUMS && test ! -s SHA256SUMS; fi' sh "$SNAPSHOT"
 ```
 
+For a stricter read-only verification, run the included checker before restoring anything:
+
+```sh
+sudo bash /opt/disk-watch/scripts/verify-installed-snapshot.sh "$SNAPSHOT"
+```
+
+It checks that the snapshot is private and owned by the invoking user, the completion marker and both manifests are consistent with the four fixed installed paths, the copied files and parent directories are not symlinks, and every checksum matches without extra entries. A zero exit **does not perform a restore**, and an empty snapshot has nothing to restore. It requires Bash and standard Linux utilities including GNU `stat` and `sha256sum`; it does not contact disks, Git, systemd or the network. This is offline validation, **not** a transactional rollback or a root-level restore test.
+
 A nonzero exit means **stop and investigate**; do not restore damaged files. Older snapshots created before checksum support have no `SHA256SUMS` and cannot pass this verification; inspect their contents and origin separately rather than treating a missing manifest as valid. SHA-256 protects against accidental corruption, **not** against an attacker able to rewrite both backup files and checksums. This check does not provide automatic rollback or prove real root-level recovery.
 
 

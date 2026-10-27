@@ -73,7 +73,7 @@ systemctl list-timers disk-watch.timer
 
 The installer deliberately does not modify `/etc/smartd.conf`. Existing SMART hooks remain valid.
 
-**New: pre-install snapshots.** Before replacing installed scripts or systemd units, `install.sh` saves any existing versions in a unique, root-private `/var/lib/disk-watch/backups/backup.TIMESTAMP.RANDOM/` directory. It records `present.txt`, `absent.txt`, and a final `.complete` marker; a failed backup stops deployment before any installed file is replaced. The snapshot excludes `/etc/disk-watch.conf`, SMART rules, Telegram secrets, and the journal cursor. The snapshots are **not automatic rollback**: restoration remains a deliberate manual operation (see [operations runbook](docs/operations.md)). The backup helper now refuses snapshot directories that are not owned by the invoking user, are not mode `700`, or already contain files (including hidden files). The installer creates a fresh private directory automatically; do not prepopulate or reuse one. Backups accumulate until an administrator reviews and removes older copies; no automatic pruning is performed. Newly created snapshots also include a relative-path `SHA256SUMS` manifest, checked before the `.complete` marker is written; this requires `sha256sum` (GNU coreutils) at installation time. Before manual recovery, verify the manifest from inside the snapshot as described in the [operations runbook](docs/operations.md). Existing older snapshots may not have checksums. Checksums detect corruption, not malicious changes by an attacker able to edit the backup and its manifest.
+**New: pre-install snapshots.** Before replacing installed scripts or systemd units, `install.sh` saves any existing versions in a unique, root-private `/var/lib/disk-watch/backups/backup.TIMESTAMP.RANDOM/` directory. It records `present.txt`, `absent.txt`, and a final `.complete` marker; a failed backup stops deployment before any installed file is replaced. The snapshot excludes `/etc/disk-watch.conf`, SMART rules, Telegram secrets, and the journal cursor. The snapshots are **not automatic rollback**: restoration remains a deliberate manual operation (see [operations runbook](docs/operations.md)). The backup helper now refuses snapshot directories that are not owned by the invoking user, are not mode `700`, or already contain files (including hidden files). The installer creates a fresh private directory automatically; do not prepopulate or reuse one. Backups accumulate until an administrator reviews and removes older copies; no automatic pruning is performed. Newly created snapshots also include a relative-path `SHA256SUMS` manifest, checked before the `.complete` marker is written; this requires `sha256sum` (GNU coreutils) at installation time. Before manual recovery, run the read-only snapshot verifier (`sudo bash /opt/disk-watch/scripts/verify-installed-snapshot.sh "$SNAPSHOT"`) as described in the [operations runbook](docs/operations.md). It rejects incomplete, damaged, unsafe or legacy snapshots; it does not restore files or change services. Existing older snapshots may not have checksums. Checksums detect corruption, not malicious changes by an attacker able to edit the backup and its manifest.
 
 
 For a **manual update**, run:
@@ -128,7 +128,7 @@ journalctl -u disk-watch.service -n 30 --no-pager
 Run the isolated smoke tests before submitting a change:
 
 ```sh
-for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh tests/*.sh; do bash -n "$script"; done
+for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/verify-installed-snapshot.sh tests/*.sh; do bash -n "$script"; done
 sh -n disk-watch-smart.sh
 bash tests/test-disk-watch.sh
 bash tests/test-mail-transport.sh
@@ -136,6 +136,8 @@ bash tests/test-portable.sh
 bash tests/test-portable-package.sh
 bash tests/test-install-preflight.sh
 bash tests/test-update.sh
+bash tests/test-backup.sh
+bash tests/test-verify-snapshot.sh
 ```
 
 The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, verifies its SHA-256 sidecar and rejection of tampering, checks its exact allowlist and executes an offline init/check from the extracted tree. Installer preflight tests run without root and verify missing-file/syntax diagnostics without calling systemctl. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
