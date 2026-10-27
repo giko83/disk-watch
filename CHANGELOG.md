@@ -12,6 +12,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Reject pre-install snapshot destinations that are not owned by the invoking user, not mode `700`, or not empty (including hidden files), before writing manifests or copies. This adds no new runtime dependency beyond the already required GNU `stat` and does not provide automatic rollback.
 - Refuse root installation when `/etc/disk-watch.conf` is a symlink, not root-owned or group/world-accessible; the guard checks metadata before snapshots or replacement, without reading secrets or modifying permissions. Existing `640` configs need manual tightening; no new service or database.
 - Reject duplicate active `ExecStart=` and timer `Unit=` directives in installer preflight, preventing a valid-looking entry from masking a later conflicting directive; no new runtime dependency.
 - Reject a syntactically valid but misdirected `disk-watch-smart.sh` during read-only installer preflight, preventing silent loss of `smartd` forwarding after an update; add an offline regression without new runtime dependencies.
