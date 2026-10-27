@@ -29,6 +29,24 @@ grep -Fxq "$missing" "$backup/absent.txt" || fail 'missing unit not in absent ma
 printf 'new script\n' > "$script"
 grep -Fxq 'old script' "$backup$script" || fail 'backup was overwritten after source changed'
 
+# Completed snapshots carry portable relative hashes of every present file.
+[[ -s "$backup/SHA256SUMS" ]] || fail 'snapshot checksum manifest missing'
+(cd "$backup" && sha256sum --status -c SHA256SUMS) ||
+  fail 'untouched snapshot checksum verification failed'
+grep -Fq './' "$backup/SHA256SUMS" || fail 'checksum paths are not relative'
+printf 'corrupted snapshot\n' > "$backup$script"
+if (cd "$backup" && sha256sum --status -c SHA256SUMS) > "$TMP/out" 2> "$TMP/err"; then
+  fail 'tampered snapshot passed checksum verification'
+fi
+
+# A fresh installation has no previously installed files to hash.
+mkdir -m 700 "$TMP/backups/backup.empty"
+bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.empty" "$missing" ||
+  fail 'empty snapshot failed'
+[[ -f "$TMP/backups/backup.empty/.complete" ]] || fail 'empty snapshot not marked complete'
+[[ -f "$TMP/backups/backup.empty/SHA256SUMS" && ! -s "$TMP/backups/backup.empty/SHA256SUMS" ]] ||
+  fail 'empty snapshot must have an empty checksum manifest'
+
 if bash "$ROOT/scripts/backup-installed.sh" "$backup" "$script" > "$TMP/out" 2> "$TMP/err"; then
   fail 'completed snapshot was reused'
 fi
@@ -74,4 +92,19 @@ fi
 [[ ! -e "$TMP/backups/backup.failed/.complete" ]] || fail 'failed copy marked complete'
 grep -Fq 'mock copy failed' "$TMP/err" || fail 'copy failure diagnostic missing'
 
-echo 'PASS: offline versioned backup, manifests, file modes, symlink and copy-failure rejection'
+# A checksum generation failure must not produce a completed snapshot.
+rm -- "$TMP/mock-bin/cp"
+cat > "$TMP/mock-bin/sha256sum" <<'MOCK'
+#!/usr/bin/env bash
+echo 'mock hash failed' >&2
+exit 46
+MOCK
+chmod +x "$TMP/mock-bin/sha256sum"
+mkdir -m 700 "$TMP/backups/backup.hashfail"
+if PATH="$TMP/mock-bin:$PATH" bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.hashfail" "$script" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'failed checksum generation accepted'
+fi
+[[ ! -e "$TMP/backups/backup.hashfail/.complete" ]] || fail 'failed checksum marked snapshot complete'
+grep -Fq 'mock hash failed' "$TMP/err" || fail 'missing checksum failure diagnostic'
+
+echo 'PASS: offline snapshot backup, relative hashes, tamper detection, empty snapshot and failure safety'
