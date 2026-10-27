@@ -20,7 +20,7 @@ On each host, one at a time:
 
    If a file is absent, stop and inspect the existing installation rather than assuming these commands are universal.
 
-4. Clone the public repository to `/opt/disk-watch`, review the diff against the installed scripts, and run `bash /opt/disk-watch/install.sh --preflight` **without sudo**. This read-only check validates required files (including `update.sh`), Bash syntax of the monitor/installer/updater, core command availability and the packaged service/timer entry points (`ExecStart=/usr/local/sbin/disk-watch.sh scan` and `Unit=disk-watch.service`) and the SMART adapter's exact forwarding target (`exec /usr/local/sbin/disk-watch.sh smart`). It also rejects duplicate active service `ExecStart=` and timer `Unit=` directives, even when the expected line is present. It does **not** parse arbitrary systemd units or validate running systemd, config permissions or notification delivery. If it fails, stop before replacing installed files. Then run `sudo bash /opt/disk-watch/install.sh`.
+4. Clone the public repository to `/opt/disk-watch`, review the diff against the installed scripts, and run `bash /opt/disk-watch/install.sh --preflight` **without sudo**. This read-only check validates required files (including `update.sh`), Bash syntax of the monitor/installer/updater, core command availability, the backup helper, and the packaged service/timer entry points (`ExecStart=/usr/local/sbin/disk-watch.sh scan` and `Unit=disk-watch.service`) and the SMART adapter's exact forwarding target (`exec /usr/local/sbin/disk-watch.sh smart`). It also rejects duplicate active service `ExecStart=` and timer `Unit=` directives, even when the expected line is present. It does **not** parse arbitrary systemd units or validate running systemd, config permissions or notification delivery. If it fails, stop before replacing installed files. Then run `sudo bash /opt/disk-watch/install.sh`.
 5. Check `systemctl list-timers disk-watch.timer`, `systemctl status disk-watch.timer --no-pager`, and `journalctl -u disk-watch.service -n 30 --no-pager`. Run `sudo /usr/local/sbin/disk-watch.sh test` and **verify receipt** through the configured transport.
 
 The installer does not change `/etc/disk-watch.conf`, `/etc/smartd.conf`, or `/var/lib/disk-watch/kernel.cursor`. Those files are host-specific; never commit them or paste secrets into GitHub issues.
@@ -30,12 +30,39 @@ The installer does not change `/etc/disk-watch.conf`, `/etc/smartd.conf`, or `/v
 - Review the commits and changes on `main`; do not update solely because a PR exists.
 - Check for uncommitted changes in the checkout with `git -C /opt/disk-watch status --short`.
 - Record the deployed revision with `git -C /opt/disk-watch rev-parse HEAD`.
-- Preserve copies of the currently installed scripts and units (see above). **The current `update.sh` is not transactional and does not automatically restore the previous version.**
+- Preserve copies of the currently installed scripts and units (see above). The installer now also creates a private pre-install snapshot, but **`update.sh` is not transactional and does not automatically restore the previous version.**
 - Update **one host at a time**, verify notifications and timer behavior, then continue to the next host.
 
-Run `sudo bash /opt/disk-watch/update.sh` only after review. It executes `git pull --ff-only`, then a read-only `install.sh --preflight` before attempting installation. A preflight failure leaves installed scripts and units unchanged, **but the Git checkout is already updated**; it does not restore the previous commit. Installation failures after preflight can still leave partial changes, so keep backups and verify each host.
+Run `sudo bash /opt/disk-watch/update.sh` only after review. It executes `git pull --ff-only`, then a read-only `install.sh --preflight` before attempting installation. A preflight failure leaves installed scripts and units unchanged, **but the Git checkout is already updated**; it does not restore the previous commit. Installation failures after preflight can still leave partial changes despite the new pre-install snapshot, so keep backups and verify each host.
 
 The repository also includes `bash tests/test-update.sh`, an **offline unprivileged regression test** for updater control flow. It uses a disposable copy of the updater with only its root guard disabled, plus mocked Git and installer commands. It covers missing/dirty checkouts, failed fast-forward pulls, failed preflight, failed installation and a successful command sequence. **It does not exercise actual root installation, backups, systemd or rollback**, so it is not a substitute for a host-specific recovery plan.
+
+## Automatic pre-install snapshots (not automatic rollback)
+
+Before replacing any installed scripts or units, `install.sh` creates a new private snapshot under `/var/lib/disk-watch/backups/backup.YYYYMMDDTHHMMSSZ.RANDOM/`. The included `scripts/backup-installed.sh` copies the **previously installed** regular files, preserving permissions, and writes `present.txt` and `absent.txt` manifests. The `.complete` marker is created **only after every copy succeeds**. If a source is a symlink or a copy fails, installation stops before replacing installed files; do not use an incomplete snapshot for recovery.
+
+A snapshot contains only previous versions of these four paths (if present): `/usr/local/sbin/disk-watch.sh`, `/usr/local/sbin/disk-watch-smart.sh`, `/etc/systemd/system/disk-watch.service`, and `/etc/systemd/system/disk-watch.timer`. It **does not** copy `/etc/disk-watch.conf`, `/etc/smartd.conf`, credentials or journal cursor/state. New installations can have entries in `absent.txt` and no previous installed files to restore.
+
+To inspect a snapshot as root, choose its exact directory and verify completion:
+
+```sh
+sudo find /var/lib/disk-watch/backups -maxdepth 1 -type d -name 'backup.*' -print
+# Replace the placeholder with one existing directory from the listing.
+SNAPSHOT=/var/lib/disk-watch/backups/backup.REPLACE_WITH_EXACT_NAME
+sudo test -f "$SNAPSHOT/.complete"
+sudo cat "$SNAPSHOT/present.txt"
+sudo cat "$SNAPSHOT/absent.txt"
+```
+
+For manual recovery, restore **only paths listed in `present.txt`** from the matching paths inside that completed snapshot, using the same-host rollback procedure below. For example, if the monitor script is listed:
+
+```sh
+sudo install -m 750 "$SNAPSHOT/usr/local/sbin/disk-watch.sh" /usr/local/sbin/disk-watch.sh
+```
+
+Likewise restore the SMART adapter and unit files when present, then `systemctl daemon-reload`, restart the timer and verify notifications. Do not blindly delete paths listed in `absent.txt`; determine whether they were newly installed and whether other services depend on them. **A snapshot is not a tested transactional rollback** and does not restore the Git checkout or reverse systemd side effects. The backup helper is covered by isolated offline tests, but real root-level restoration is not yet verified.
+
+Snapshots are never automatically pruned. Review and remove old backups manually only after confirming a stable installation and keeping an appropriate recovery point; do not include private config or secrets in GitHub reports.
 
 ## Manual rollback of deployed files
 

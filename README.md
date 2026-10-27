@@ -59,7 +59,7 @@ Before installing, run the **read-only preflight** from the checkout (no root or
 bash /opt/disk-watch/install.sh --preflight
 ```
 
-It checks required source/unit files (including the updater), Bash syntax for the monitor, installer and updater, core command availability, and the packaged service/timer entry points (`ExecStart` and `Unit`) plus the SMART adapter's installed `smart` handler target, without installing or contacting any disk. These checks also reject duplicate active `ExecStart=` or timer `Unit=` directives that could override the expected entries. They are exact checks for the shipped unit files, **not** full systemd unit validation. It does **not** validate the live notification transport, systemd runtime, or permissions; keep the backup and post-install checks described in the [operations runbook](docs/operations.md).
+It checks required source/unit files (including the updater), Bash syntax for the monitor, installer and updater, core command availability, the backup helper, and the packaged service/timer entry points (`ExecStart` and `Unit`) plus the SMART adapter's installed `smart` handler target, without installing or contacting any disk. These checks also reject duplicate active `ExecStart=` or timer `Unit=` directives that could override the expected entries. They are exact checks for the shipped unit files, **not** full systemd unit validation. It does **not** validate the live notification transport, systemd runtime, or permissions; keep the backup and post-install checks described in the [operations runbook](docs/operations.md).
 
 Install the scripts and systemd units:
 
@@ -71,13 +71,16 @@ systemctl list-timers disk-watch.timer
 
 The installer deliberately does not modify `/etc/smartd.conf`. Existing SMART hooks remain valid.
 
+**New: pre-install snapshots.** Before replacing installed scripts or systemd units, `install.sh` saves any existing versions in a unique, root-private `/var/lib/disk-watch/backups/backup.TIMESTAMP.RANDOM/` directory. It records `present.txt`, `absent.txt`, and a final `.complete` marker; a failed backup stops deployment before any installed file is replaced. The snapshot excludes `/etc/disk-watch.conf`, SMART rules, Telegram secrets, and the journal cursor. The snapshots are **not automatic rollback**: restoration remains a deliberate manual operation (see [operations runbook](docs/operations.md)). Backups accumulate until an administrator reviews and removes older copies; no automatic pruning is performed.
+
+
 For a **manual update**, run:
 
 ```sh
 sudo bash /opt/disk-watch/update.sh
 ```
 
-This runs `git pull --ff-only`, checks the downloaded checkout with `install.sh --preflight`, then redeploys the scripts only if preflight succeeds. If preflight fails, installed files are not replaced, **but the Git checkout has already advanced**. It does not overwrite your Telegram token or journal cursor. It is NOT a transactional rollback mechanism. Do not enable automatic updates until reviewed and tested.
+This runs `git pull --ff-only`, checks the downloaded checkout with `install.sh --preflight`, then redeploys the scripts only if preflight succeeds. If preflight fails, installed files are not replaced, **but the Git checkout has already advanced**. It does not overwrite your Telegram token or journal cursor. It creates a pre-install snapshot before replacing files, but is NOT a transactional rollback mechanism: failures after the snapshot may still leave partial changes. Do not enable automatic updates until reviewed and tested.
 
 For safe rollout, verification, and manual rollback on existing hosts, see the [operations runbook](docs/operations.md). The updater does **not** provide automatic rollback.
 
