@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Before replacing installed files, the root installer now creates a timestamped, private pre-install snapshot of existing Disk Watch scripts and systemd units with present/absent manifests and a final completion marker. Backup errors abort installation; there is still no automatic rollback or backup pruning. No config, credentials or cursor are copied.
 - Generate a portable archive SHA-256 checksum sidecar with a relative filename, allowing offline integrity verification even when the archive and checksum are moved together. The checksum is not an authenticity signature and adds no runtime dependency.
 - Add a read-only, unprivileged `install.sh --preflight` command that checks required files, Bash/POSIX shell syntax and core commands before deployment. The updater invokes it after `git pull --ff-only` and before installing files; it is not a rollback mechanism.
 - Add an offline, allowlist-based portable source archive builder (`scripts/build-portable.sh`), without Git, root, systemd or new runtime dependencies.
@@ -22,6 +23,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Add offline snapshot regression tests for preserved content/modes, missing-file manifests, refusal to reuse a completed snapshot, symlink rejection and copy failure; extend installer preflight tests to reject a missing or syntactically invalid backup helper.
 - Add unprivileged offline updater control-flow regression coverage with mocked Git and installer: missing/dirty checkout, failed fast-forward pull, failed preflight, failed install and successful ordered update. CI runs the suite; no real Git pull, installation or network is performed.
 - Add offline negative cases for conflicting duplicate systemd service and timer directives; verify preflight never invokes `systemctl`.
 - Add offline negative cases for a missing updater and invalid updater Bash syntax in the read-only installer preflight suite.
@@ -37,6 +39,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add a regression test ensuring a missing Telegram bot token fails the disk scan without advancing its journal cursor or contacting Telegram, allowing the pending alert to be retried after configuration is fixed.
 
 ### Documentation
+- Explain versioned pre-install snapshots, how to inspect a completed manifest and limitations of manual recovery in README and the operations runbook.
 - Explain duplicate systemd directive detection and the limits of the lightweight preflight in README and operations runbook.
 - Show how to verify the portable source archive before extraction and clarify checksum limitations and the build-only `sha256sum` dependency.
 - Explain installer preflight limitations and safe manual update behavior in README and the operations runbook.
