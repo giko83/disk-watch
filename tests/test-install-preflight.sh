@@ -11,6 +11,8 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 mkdir -p "$TMP/source" "$TMP/mock-bin"
 cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
    "$ROOT/disk-watch.service" "$ROOT/disk-watch.timer" "$TMP/source/"
+mkdir -p "$TMP/source/scripts"
+cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/"
 
 # If the preflight ever calls systemctl rather than just checking availability,
 # the mock leaves a detectable marker and fails.
@@ -45,6 +47,24 @@ fi
 grep -Fq 'missing or empty update.sh' "$TMP/err" ||
   fail 'missing updater diagnostic absent'
 mv "$TMP/missing-updater" "$TMP/source/update.sh"
+
+# A missing backup helper must be caught before any installed file changes.
+mv "$TMP/source/scripts/backup-installed.sh" "$TMP/missing-backup"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'missing backup helper passed preflight'
+fi
+grep -Fq 'missing or empty scripts/backup-installed.sh' "$TMP/err" ||
+  fail 'missing backup helper diagnostic absent'
+mv "$TMP/missing-backup" "$TMP/source/scripts/backup-installed.sh"
+
+# Reject a syntactically broken backup helper.
+printf '%s\n' 'if then' >> "$TMP/source/scripts/backup-installed.sh"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'broken backup helper syntax passed preflight'
+fi
+grep -Fq 'invalid Bash syntax' "$TMP/err" ||
+  fail 'invalid backup helper diagnostic absent'
+cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/backup-installed.sh"
 
 # Reject broken updater syntax before replacing installed files.
 printf '%s\n' 'if then' >> "$TMP/source/update.sh"
@@ -117,4 +137,4 @@ fi
 grep -Fq 'Usage:' "$TMP/err" || fail 'invalid option diagnostic absent'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight or argument error invoked systemctl'
 
-echo 'PASS: read-only installer preflight, updater validation, unit and SMART adapter checks, invalid syntax and options'
+echo 'PASS: read-only installer preflight, updater and backup validation, unit and SMART adapter checks, invalid syntax and options'
