@@ -31,7 +31,7 @@ preflight() {
 
   # Core runtime and deployment tools only. curl/sendmail/smartctl are optional
   # and depend on the selected notification and SMART integrations.
-  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat; do
+  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat sha256sum; do
     command -v "$cmd" >/dev/null 2>&1 || {
       echo "Preflight failed: required command not found: $cmd" >&2
       return 1

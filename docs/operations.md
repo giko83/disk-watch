@@ -41,7 +41,7 @@ The repository also includes `bash tests/test-update.sh`, an **offline unprivile
 
 ## Automatic pre-install snapshots (not automatic rollback)
 
-Before replacing any installed scripts or units, `install.sh` creates a new private snapshot under `/var/lib/disk-watch/backups/backup.YYYYMMDDTHHMMSSZ.RANDOM/`. The included `scripts/backup-installed.sh` copies the **previously installed** regular files, preserving permissions, and writes `present.txt` and `absent.txt` manifests. The `.complete` marker is created **only after every copy succeeds**. The helper also refuses a directory not owned by the invoking user, not mode `700`, or already containing any entry (including hidden files), before writing manifests. The installer creates a fresh private directory automatically. If a source is a symlink, the directory is unsafe, or a copy fails, installation stops before replacing installed files; do not use an incomplete snapshot for recovery. This is a local safeguard, not a defense against a compromised root account or an unsafe parent directory.
+Before replacing any installed scripts or units, `install.sh` creates a new private snapshot under `/var/lib/disk-watch/backups/backup.YYYYMMDDTHHMMSSZ.RANDOM/`. The included `scripts/backup-installed.sh` copies the **previously installed** regular files, preserving permissions, and writes `present.txt` and `absent.txt` manifests. New snapshots also contain `SHA256SUMS` with relative paths for every copied file; hashes are verified before `.complete` is written. A new installation with no previous files has an empty checksum manifest. The `.complete` marker is created **only after every copy and checksum verification succeeds**. The installer preflight now requires GNU `sha256sum` (coreutils), which is already used by the optional portable archive builder. The helper also refuses a directory not owned by the invoking user, not mode `700`, or already containing any entry (including hidden files), before writing manifests. The installer creates a fresh private directory automatically. If a source is a symlink, the directory is unsafe, or a copy fails, installation stops before replacing installed files; do not use an incomplete snapshot for recovery. This is a local safeguard, not a defense against a compromised root account or an unsafe parent directory.
 
 A snapshot contains only previous versions of these four paths (if present): `/usr/local/sbin/disk-watch.sh`, `/usr/local/sbin/disk-watch-smart.sh`, `/etc/systemd/system/disk-watch.service`, and `/etc/systemd/system/disk-watch.timer`. It **does not** copy `/etc/disk-watch.conf`, `/etc/smartd.conf`, credentials or journal cursor/state. New installations can have entries in `absent.txt` and no previous installed files to restore.
 
@@ -55,6 +55,15 @@ sudo test -f "$SNAPSHOT/.complete"
 sudo cat "$SNAPSHOT/present.txt"
 sudo cat "$SNAPSHOT/absent.txt"
 ```
+
+For snapshots created with this feature, **verify checksums before any restore**, using relative paths from the snapshot directory:
+
+```sh
+sudo sh -c 'cd "$1" || exit; if [ -s present.txt ]; then sha256sum -c SHA256SUMS; else test -f SHA256SUMS && test ! -s SHA256SUMS; fi' sh "$SNAPSHOT"
+```
+
+A nonzero exit means **stop and investigate**; do not restore damaged files. Older snapshots created before checksum support have no `SHA256SUMS` and cannot pass this verification; inspect their contents and origin separately rather than treating a missing manifest as valid. SHA-256 protects against accidental corruption, **not** against an attacker able to rewrite both backup files and checksums. This check does not provide automatic rollback or prove real root-level recovery.
+
 
 For manual recovery, restore **only paths listed in `present.txt`** from the matching paths inside that completed snapshot, using the same-host rollback procedure below. For example, if the monitor script is listed:
 
