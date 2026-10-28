@@ -16,11 +16,13 @@ cd "$(dirname "$0")"
 # Read-only checks; safe to run as an unprivileged user before deploying.
 preflight() {
   local file cmd
-  for file in disk-watch.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh; do
+  for file in disk-watch.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
   done
 
-  (bash -n disk-watch.sh && bash -n install.sh && bash -n update.sh && bash -n scripts/backup-installed.sh && bash -n scripts/check-config.sh) || {
+  (bash -n disk-watch.sh && bash -n install.sh && bash -n update.sh && bash -n scripts/backup-installed.sh && bash -n scripts/check-config.sh &&
+   bash -n scripts/verify-installed-snapshot.sh && bash -n scripts/plan-installed-restore.sh &&
+   bash -n scripts/rehearse-installed-restore.sh) || {
     echo 'Preflight failed: invalid Bash syntax' >&2
     return 1
   }

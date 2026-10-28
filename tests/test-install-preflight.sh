@@ -12,7 +12,9 @@ mkdir -p "$TMP/source" "$TMP/mock-bin"
 cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
    "$ROOT/disk-watch.service" "$ROOT/disk-watch.timer" "$TMP/source/"
 mkdir -p "$TMP/source/scripts"
-cp "$ROOT/scripts/backup-installed.sh" "$ROOT/scripts/check-config.sh" "$TMP/source/scripts/"
+cp "$ROOT/scripts/backup-installed.sh" "$ROOT/scripts/check-config.sh" \
+   "$ROOT/scripts/verify-installed-snapshot.sh" "$ROOT/scripts/plan-installed-restore.sh" \
+   "$ROOT/scripts/rehearse-installed-restore.sh" "$TMP/source/scripts/"
 
 # If the preflight ever calls systemctl rather than just checking availability,
 # the mock leaves a detectable marker and fails.
@@ -65,6 +67,27 @@ fi
 grep -Fq 'invalid Bash syntax' "$TMP/err" ||
   fail 'invalid backup helper diagnostic absent'
 cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/backup-installed.sh"
+
+# Recovery helpers are not installed on hosts, but must remain usable from
+# the checkout before an update that may require manual restoration.
+for helper in verify-installed-snapshot.sh plan-installed-restore.sh rehearse-installed-restore.sh; do
+  mv "$TMP/source/scripts/$helper" "$TMP/missing-$helper"
+  if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+    fail "missing recovery helper $helper passed preflight"
+  fi
+  grep -Fq "missing or empty scripts/$helper" "$TMP/err" ||
+    fail "missing recovery helper diagnostic for $helper"
+  mv "$TMP/missing-$helper" "$TMP/source/scripts/$helper"
+
+  printf '%s\n' 'if then' >> "$TMP/source/scripts/$helper"
+  if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+    fail "broken recovery helper $helper passed preflight"
+  fi
+  grep -Fq 'invalid Bash syntax' "$TMP/err" ||
+    fail "invalid recovery helper syntax diagnostic for $helper"
+  cp "$ROOT/scripts/$helper" "$TMP/source/scripts/$helper"
+done
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'recovery helper preflight invoked systemctl'
 
 # A missing or broken config metadata checker must block deployment preflight.
 mv "$TMP/source/scripts/check-config.sh" "$TMP/missing-config-check"
