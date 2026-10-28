@@ -114,6 +114,32 @@ grep -Fq 'Refusing symlink in portable archive input: docs/' "$TMP/docs-symlink.
 [[ ! -e "$TMP/forbidden-docs.tar.gz" && ! -e "$TMP/forbidden-docs.tar.gz.sha256" ]] ||
   fail 'builder created an archive after rejecting symlinked docs'
 
+# Refuse symlinked archive and checksum output paths without overwriting the
+# referenced files. This runs entirely offline in a private temporary folder.
+printf 'KEEP_ARCHIVE_TARGET\n' > "$TMP/archive-target"
+ln -s -- "$TMP/archive-target" "$TMP/linked-output.tar.gz"
+if bash "$ROOT/scripts/build-portable.sh" "$TMP/linked-output.tar.gz" > "$TMP/output-symlink.log" 2>&1; then
+  fail 'builder accepted a symlinked archive output'
+fi
+grep -Fq 'Refusing symlink in portable archive output:' "$TMP/output-symlink.log" ||
+  fail 'missing archive output symlink diagnostic'
+[[ $(cat "$TMP/archive-target") == KEEP_ARCHIVE_TARGET ]] ||
+  fail 'builder overwrote the archive symlink target'
+[[ ! -e "$TMP/linked-output.tar.gz.sha256" ]] ||
+  fail 'builder created a checksum for a rejected archive output'
+
+printf 'KEEP_CHECKSUM_TARGET\n' > "$TMP/checksum-target"
+ln -s -- "$TMP/checksum-target" "$TMP/linked-checksum.tar.gz.sha256"
+if bash "$ROOT/scripts/build-portable.sh" "$TMP/linked-checksum.tar.gz" > "$TMP/checksum-symlink.log" 2>&1; then
+  fail 'builder accepted a symlinked checksum output'
+fi
+grep -Fq 'Refusing symlink in portable archive output:' "$TMP/checksum-symlink.log" ||
+  fail 'missing checksum output symlink diagnostic'
+[[ $(cat "$TMP/checksum-target") == KEEP_CHECKSUM_TARGET ]] ||
+  fail 'builder overwrote the checksum symlink target'
+[[ ! -e "$TMP/linked-checksum.tar.gz" ]] ||
+  fail 'builder created an archive with a rejected checksum output'
+
 # The checksum must detect corruption, not just exist.
 printf 'tampered' >> "$ARCHIVE"
 if (cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") > /dev/null 2>&1; then
