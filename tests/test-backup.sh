@@ -39,6 +39,15 @@ if (cd "$backup" && sha256sum --status -c SHA256SUMS) > "$TMP/out" 2> "$TMP/err"
   fail 'tampered snapshot passed checksum verification'
 fi
 
+# Reject repeated source paths before creating any manifest or snapshot file.
+mkdir -m 700 "$TMP/backups/backup.duplicate"
+if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.duplicate" "$script" "$script" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'duplicate source was accepted'
+fi
+grep -Fq 'duplicate source' "$TMP/err" || fail 'missing duplicate-source diagnostic'
+[[ -z $(find "$TMP/backups/backup.duplicate" -mindepth 1 -print -quit) ]] ||
+  fail 'duplicate source created snapshot contents'
+
 # A fresh installation has no previously installed files to hash.
 mkdir -m 700 "$TMP/backups/backup.empty"
 bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.empty" "$missing" ||
