@@ -29,6 +29,7 @@ FILES=(
   LICENSE
   CHANGELOG.md
   docs/portable.md
+  docs/health.md
   docs/ROADMAP.md
   docs/operations.md
   docs/smart-usb-standby.md
