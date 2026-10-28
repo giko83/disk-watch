@@ -20,6 +20,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Refuse to publish a portable archive when a checksum command reports success but produces an empty sidecar, or when the staged checksum cannot verify the staged archive. Existing artifacts remain intact; no new build or runtime dependencies.
 - Stage portable archive and checksum in a private temporary output directory, preserving existing artifacts if compression or hashing fails; add offline failure-injection regression. The final two renames are not an atomic pair; `mv` is build-only and runtime requirements are unchanged.
 - Reject pre-install backup source files reached through symlinked parent directories (including nested descendants), not just symlinked leaf files; offline regression verifies no manifests or partial backup are written. Uses existing `dirname`; this is a best-effort check, not race-proof, and does not change installed files or runtime dependencies.
 - Refuse existing non-regular portable archive/checksum outputs (including FIFOs) and hard links to allowlisted source files or the builder before writing. Prevents blocked builds and accidental source truncation; the preflight is not race-proof and adds no runtime dependency.
@@ -43,6 +44,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Mock `sha256sum` returning success with an empty digest or an incorrect non-empty digest: confirm clear failures, unchanged existing archive/checksum, no new partial artifacts and removal of temporary staging (offline, no root or disks).
 - Exercise FIFO archive output refusal with a bounded offline run and hardlinked archive/checksum outputs against an isolated source fixture; verify diagnostics, unchanged source bytes and no partial companion files.
 - Exercise symlinked archive and checksum output paths with offline fixtures; assert a clear refusal, unchanged target contents and no partial companion artifact.
 - Add an offline duplicate-source backup regression that asserts a clear diagnostic and an untouched private snapshot directory.

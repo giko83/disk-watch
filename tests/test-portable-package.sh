@@ -52,6 +52,54 @@ fi
 [[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
   fail 'failed build left an output staging directory'
 
+# A broken checksum provider can exit zero without producing a digest. Never
+# publish an empty sidecar or replace a previously verified archive in this case.
+mkdir -p "$TMP/silent-hash-tools"
+cat > "$TMP/silent-hash-tools/sha256sum" <<'MOCK'
+#!/usr/bin/env bash
+exit 0
+MOCK
+chmod +x "$TMP/silent-hash-tools/sha256sum"
+if PATH="$TMP/silent-hash-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE" > "$TMP/silent-hash.log" 2>&1; then
+  fail 'builder accepted a successful checksum command with no digest output'
+fi
+grep -Fq 'Portable archive checksum creation or verification failed' "$TMP/silent-hash.log" ||
+  fail 'missing empty checksum diagnostic'
+cmp -s -- "$ARCHIVE" "$TMP/known-good.tar.gz" ||
+  fail 'silent checksum failure replaced a valid archive'
+cmp -s -- "$ARCHIVE.sha256" "$TMP/known-good.sha256" ||
+  fail 'silent checksum failure replaced a valid checksum'
+if PATH="$TMP/silent-hash-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$TMP/no-hash-new.tar.gz" > "$TMP/silent-new.log" 2>&1; then
+  fail 'new build accepted an empty checksum sidecar'
+fi
+[[ ! -e "$TMP/no-hash-new.tar.gz" && ! -e "$TMP/no-hash-new.tar.gz.sha256" ]] ||
+  fail 'silent checksum failure left a partial new artifact'
+[[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
+  fail 'silent checksum failure left an output staging directory'
+
+# A non-empty but incorrect digest must also fail verification before either
+# artifact is published. Delegate verification to the real checksum utility.
+mkdir -p "$TMP/wrong-hash-tools"
+cat > "$TMP/wrong-hash-tools/sha256sum" <<'MOCK'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-c' ]]; then
+  exec /usr/bin/sha256sum "$@"
+fi
+printf '%064d  %s\n' 0 "${2:-}"
+MOCK
+chmod +x "$TMP/wrong-hash-tools/sha256sum"
+if PATH="$TMP/wrong-hash-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE" > "$TMP/wrong-hash.log" 2>&1; then
+  fail 'builder accepted a checksum that does not match the staged archive'
+fi
+grep -Fq 'Portable archive checksum creation or verification failed' "$TMP/wrong-hash.log" ||
+  fail 'missing mismatched checksum diagnostic'
+cmp -s -- "$ARCHIVE" "$TMP/known-good.tar.gz" ||
+  fail 'mismatched checksum replaced a valid archive'
+cmp -s -- "$ARCHIVE.sha256" "$TMP/known-good.sha256" ||
+  fail 'mismatched checksum replaced a valid checksum'
+[[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
+  fail 'mismatched checksum left an output staging directory'
+
 # An exact allowlist prevents accidental inclusion of secrets or Git metadata.
 tar -tzf "$ARCHIVE" | grep -v '/$' | sort > "$TMP/actual"
 cat > "$TMP/expected" <<'EXPECTED'
