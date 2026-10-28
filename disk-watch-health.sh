@@ -13,7 +13,7 @@ Usage: disk-watch.sh status|disks|health|history|report [options]
 Options:
   --state-dir DIR    Override state storage
   --format text|tsv  Text or stable TSV output (default: text)
-  --device ID        Explicit /dev path for refresh or saved serial for history
+  --device ID        Explicit /dev path for refresh, or cached path/serial filter
   --refresh          Save a fresh SMART snapshot (health only)
   --wake-ok          Required with --refresh: SMART may spin up sleeping disks
 Reading existing reports never calls smartctl, journalctl or any disk device.
