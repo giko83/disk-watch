@@ -122,6 +122,7 @@ if [[ $action == status ]]; then
   else
     printf 'Snapshots: %s\nDisks with snapshots: %s\nLast snapshot: %s\n' "$n" "$d" "$last"
     echo 'Last alert: unavailable (event history not yet persisted)'
+    [[ $n != 0 ]] || echo 'SMART history: unavailable (no saved snapshots)'
   fi
   exit 0
 fi
