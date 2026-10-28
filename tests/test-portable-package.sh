@@ -58,8 +58,8 @@ cat > "$TMP/expected" <<'EXPECTED'
 disk-watch-portable/CHANGELOG.md
 disk-watch-portable/LICENSE
 disk-watch-portable/README.md
-disk-watch-portable/disk-watch.conf.example
 disk-watch-portable/disk-watch-health.sh
+disk-watch-portable/disk-watch.conf.example
 disk-watch-portable/disk-watch.sh
 disk-watch-portable/docs/ROADMAP.md
 disk-watch-portable/docs/health.md
