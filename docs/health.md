@@ -15,7 +15,7 @@ sudo /usr/local/sbin/disk-watch.sh report --since 2026-10-01
 sudo /usr/local/sbin/disk-watch.sh disks --format tsv
 ```
 
-The `health` command without refresh is simply the last saved SMART snapshot per disk, **not a live scan**. On a new installation it honestly reports `SMART history: unavailable` until at least one opt-in snapshot exists. `status --format tsv` exports key/value rows; the other TSV commands export a 13-column snapshot schema. For offline tests or portable mode, provide `--state-dir DIR` *after* the subcommand, or use `DISK_WATCH_STATE_DIR`.
+The `health` command without refresh is simply the last saved SMART snapshot per disk, **not a live scan**. You can limit it with `health --device SERIAL` (or the saved device path) without probing the drive. On a new installation it honestly reports `SMART history: unavailable` until at least one opt-in snapshot exists. `status --format tsv` exports key/value rows; the other TSV commands export a 13-column snapshot schema. For offline tests or portable mode, provide `--state-dir DIR` *after* the subcommand, or use `DISK_WATCH_STATE_DIR`.
 
 ## Explicitly collect a SMART health snapshot
 
