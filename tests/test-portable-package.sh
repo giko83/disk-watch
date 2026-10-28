@@ -85,7 +85,7 @@ cat > "$TMP/wrong-hash-tools/sha256sum" <<'MOCK'
 if [[ "${1:-}" == '-c' ]]; then
   exec /usr/bin/sha256sum "$@"
 fi
-printf '%064d  %s\\n' 0 "${2:-}"
+printf '%064d  %s\n' 0 "${2:-}"
 MOCK
 chmod +x "$TMP/wrong-hash-tools/sha256sum"
 if PATH="$TMP/wrong-hash-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE" > "$TMP/wrong-hash.log" 2>&1; then
