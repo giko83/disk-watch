@@ -40,6 +40,19 @@ bash ./disk-watch.sh --help
 
 The archive builder needs Bash and standard Linux build utilities (GNU `tar`, `gzip`, `cp`, `mktemp`, `chmod`, `sha256sum`); no root, Git at build time, Python, database, network or systemd timer. Identical source files now produce a byte-identical archive across repeated builds and caller umasks: archive timestamps and ownership are normalized, documentation is non-executable and only `disk-watch.sh` is executable. This is a reproducible local source bundle, **not** a published or signed release. It writes a companion `.sha256` file to check for accidental archive corruption (not a signature or proof of authenticity). The archive includes only an explicit list of public files, **not** your real configuration, secrets, cursor or local state. Keep a trusted configuration outside the extracted directory and use `--config` / `--state-dir` as shown above. Kernel checks still require a readable `journalctl`; the archive is not a prebuilt binary or a GitHub release. See [portable usage](docs/portable.md). The builder refuses symbolic links for any allowlisted input and for the `docs/` directory, to avoid copying private files from outside the checkout into a public archive. Use regular files from a trusted source tree; no runtime prerequisites change. It also rejects pre-existing symbolic links, non-regular output targets (such as FIFOs), and existing output files hardlinked to an allowlisted source or the builder itself, at either the archive or `.sha256` path. This prevents blocking on a FIFO or accidentally truncating a packaged source file; ordinary existing archive files can still be rebuilt. Build into a directory you control; the check is not atomic protection against a concurrent attacker replacing paths. The builder stages the archive and checksum beside the destination, so a failed compression or checksum generation leaves existing artifacts intact and removes temporary staging files. Publication uses two separate renames, **not an atomic archive/checksum pair**: do not read or distribute artifacts during a concurrent rebuild. GNU `mv` is a build-only utility; runtime requirements are unchanged.
 
+## Cached disk health reports (opt-in SMART collection)
+
+The CLI now supports `status`, `disks`, `health`, `history --device ID`, and `report --since YYYY-MM-DD`. **Reading saved results never runs smartctl or wakes disks.** A live reading is explicitly opt-in, may wake a sleeping disk, and requires `smartmontools`:
+
+```sh
+sudo /usr/local/sbin/disk-watch.sh status
+sudo /usr/local/sbin/disk-watch.sh disks
+sudo /usr/local/sbin/disk-watch.sh health --device /dev/nvme0 --refresh --wake-ok
+sudo /usr/local/sbin/disk-watch.sh history --device SERIAL --format tsv
+```
+
+Data is saved in `/var/lib/disk-watch/health/snapshots.tsv` only after a deliberate refresh, not as part of the one-minute monitoring timer. **Never use --refresh on intentionally sleeping USB backup drives unless you want to wake them.** The initial cache may be empty and report `unavailable`. See [the health command guide](docs/health.md) for limitations, NVMe write estimates, permissions and the machine-readable TSV format.
+
 ## Existing or new installation
 
 Clone into `/opt/disk-watch`:
@@ -136,6 +149,7 @@ bash tests/test-portable.sh
 bash tests/test-portable-package.sh
 bash tests/test-install-preflight.sh
 bash tests/test-update.sh
+bash tests/test-health.sh
 bash tests/test-backup.sh
 bash tests/test-verify-snapshot.sh
 ```
