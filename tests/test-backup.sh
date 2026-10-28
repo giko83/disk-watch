@@ -90,7 +90,7 @@ fi
 # A regular file reached through a symlinked parent must also be refused
 # before creating manifests. Test a nested descendant, not just a leaf link.
 mkdir -p "$TMP/live/actual-parent/nested"
-printf 'private source\\n' > "$TMP/live/actual-parent/nested/file"
+printf '%s' 'private source' > "$TMP/live/actual-parent/nested/file"
 ln -s "$TMP/live/actual-parent" "$TMP/live/alias-parent"
 mkdir -m 700 "$TMP/backups/backup.parent-link"
 if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.parent-link" \
@@ -101,7 +101,7 @@ grep -Fq 'refusing symlinked source parent' "$TMP/err" || \
   fail 'missing symlinked parent diagnostic'
 [[ -z $(find "$TMP/backups/backup.parent-link" -mindepth 1 -print -quit) ]] || \
   fail 'symlinked parent created snapshot contents'
-grep -Fxq 'private source\\n' "$TMP/live/actual-parent/nested/file" || \
+grep -Fxq 'private source' "$TMP/live/actual-parent/nested/file" || \
   fail 'source changed after symlinked parent rejection'
 
 mkdir -p "$TMP/mock-bin"
