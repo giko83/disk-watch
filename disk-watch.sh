@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Read-only disk reports bypass the notification config and the journal.
+# The health helper only calls smartctl after explicit --refresh --wake-ok.
+case "${1:-}" in
+  status|disks|health|history|report)
+    exec bash "$(dirname "${BASH_SOURCE[0]}")/disk-watch-health.sh" "$@" ;;
+esac
+
 # Parse portable CLI options before reading configuration or touching state.
 usage() {
   cat <<'USAGE'
 Usage: disk-watch.sh [--config FILE] [--state-dir DIR] [init|check|scan|test|smart]
+       disk-watch.sh status|disks|health|history|report [options] (see docs/health.md)
 
   check     Scan new kernel messages once (alias of scan; suitable for cron).
   init      Seed the journal cursor without replaying older messages.
