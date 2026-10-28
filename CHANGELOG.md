@@ -18,6 +18,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Stage portable archive and checksum in a private temporary output directory, preserving existing artifacts if compression or hashing fails; add offline failure-injection regression. The final two renames are not an atomic pair; `mv` is build-only and runtime requirements are unchanged.
 - Reject pre-install backup source files reached through symlinked parent directories (including nested descendants), not just symlinked leaf files; offline regression verifies no manifests or partial backup are written. Uses existing `dirname`; this is a best-effort check, not race-proof, and does not change installed files or runtime dependencies.
 - Refuse existing non-regular portable archive/checksum outputs (including FIFOs) and hard links to allowlisted source files or the builder before writing. Prevents blocked builds and accidental source truncation; the preflight is not race-proof and adds no runtime dependency.
 - Refuse pre-existing symlinks at either portable archive or `.sha256` output path before writing, avoiding accidental clobbering of symlink targets. Use a trusted output directory; this best-effort check does not eliminate concurrent path-replacement races. No new build or runtime dependency.
