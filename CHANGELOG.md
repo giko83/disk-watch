@@ -37,6 +37,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Exercise symlinked archive and checksum output paths with offline fixtures; assert a clear refusal, unchanged target contents and no partial companion artifact.
 - Add an offline duplicate-source backup regression that asserts a clear diagnostic and an untouched private snapshot directory.
 - Simulate a mid-rehearsal copy failure after an earlier successful copy; assert an empty sandbox, a diagnostic and unchanged snapshot hashes (offline, no root or hardware).
 - Exercise missing and syntactically broken recovery helpers in unprivileged installer preflight fixtures; confirm no systemctl invocation. CI also checks the helper scripts directly with Bash syntax validation.
