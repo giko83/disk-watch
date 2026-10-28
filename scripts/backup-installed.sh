@@ -54,7 +54,9 @@ for src in "$@"; do
   # snapshot could be marked complete but would fail strict verification.
   occurrences=0
   for other in "$@"; do
-    [[ $src == "$other" ]] && ((occurrences += 1))
+    if [[ $src == "$other" ]]; then
+      ((occurrences += 1))
+    fi
   done
   if ((occurrences != 1)); then
     echo "Backup failed: duplicate source: $src" >&2
