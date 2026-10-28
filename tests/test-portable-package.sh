@@ -16,6 +16,16 @@ ARCHIVE="$TMP/portable build.tar.gz"
 grep -Fq 'portable build.tar.gz' "$ARCHIVE.sha256" ||
   fail 'checksum must use a portable basename rather than an absolute path'
 
+# Rebuilding identical source bytes must produce the same archive even with
+# different staging directories and caller umasks (no root/network required).
+mkdir -p "$TMP/rebuild one" "$TMP/rebuild two"
+(umask 077; bash "$ROOT/scripts/build-portable.sh" "$TMP/rebuild one/bundle.tar.gz") >/dev/null
+(umask 022; bash "$ROOT/scripts/build-portable.sh" "$TMP/rebuild two/bundle.tar.gz") >/dev/null
+cmp -s -- "$TMP/rebuild one/bundle.tar.gz" "$TMP/rebuild two/bundle.tar.gz" ||
+  fail 'portable archive bytes differ across builds or umasks'
+(cd -- "$TMP/rebuild one" && sha256sum -c bundle.tar.gz.sha256) >/dev/null ||
+  fail 'reproducible archive checksum invalid'
+
 # An exact allowlist prevents accidental inclusion of secrets or Git metadata.
 tar -tzf "$ARCHIVE" | grep -v '/$' | sort > "$TMP/actual"
 cat > "$TMP/expected" <<'EXPECTED'
@@ -81,4 +91,4 @@ if (cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") > /dev/null 
   fail 'checksum accepted a modified archive'
 fi
 
-echo 'PASS: portable archive allowlist, checksum integrity and offline init/check smoke test'
+echo 'PASS: reproducible portable archive, allowlist, checksum integrity and offline init/check smoke test'

@@ -34,8 +34,12 @@ trap 'rm -rf -- "$STAGE"' EXIT
 mkdir -p -- "$STAGE/disk-watch-portable/docs"
 for file in "${FILES[@]}"; do
   cp -- "$ROOT/$file" "$STAGE/disk-watch-portable/$file"
+  # Normalize copied file modes: a source checkout's umask must not change
+  # the archive bytes or unexpectedly expose executable documentation.
+  chmod 644 -- "$STAGE/disk-watch-portable/$file"
 done
-chmod 755 -- "$STAGE/disk-watch-portable/disk-watch.sh"
+chmod 755 -- "$STAGE/disk-watch-portable" "$STAGE/disk-watch-portable/docs" \
+  "$STAGE/disk-watch-portable/disk-watch.sh"
 
 # Checksums are a build-time convenience, not a new runtime requirement.
 # Fail before packaging if the host cannot generate a checksum.
@@ -46,7 +50,11 @@ command -v sha256sum >/dev/null 2>&1 || {
 OUTPUT_DIR=$(dirname -- "$OUTPUT")
 OUTPUT_FILE=$(basename -- "$OUTPUT")
 mkdir -p -- "$OUTPUT_DIR"
-tar -czf "$OUTPUT" -C "$STAGE" disk-watch-portable
+# Stable ordering, timestamp, ownership, permissions and gzip header make
+# repeated builds of identical source bytes reproducible across directories
+# and umasks. GNU tar and gzip are build-only tools, not runtime dependencies.
+tar --format=gnu --sort=name --mtime='@0' --owner=0 --group=0 \
+  --numeric-owner -cf - -C "$STAGE" disk-watch-portable | gzip -n > "$OUTPUT"
 # Write only the basename so the archive and sidecar remain verifiable
 # after moving both files together to a different directory.
 (cd -- "$OUTPUT_DIR" && sha256sum -- "$OUTPUT_FILE" > "$OUTPUT_FILE.sha256")
