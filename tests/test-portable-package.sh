@@ -77,6 +77,29 @@ fi
 [[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
   fail 'silent checksum failure left an output staging directory'
 
+# A non-empty but incorrect digest must also fail verification before either
+# artifact is published. Delegate verification to the real checksum utility.
+mkdir -p "$TMP/wrong-hash-tools"
+cat > "$TMP/wrong-hash-tools/sha256sum" <<'MOCK'
+#!/usr/bin/env bash
+if [[ "${1:-}" == '-c' ]]; then
+  exec /usr/bin/sha256sum "$@"
+fi
+printf '%064d  %s\\n' 0 "${2:-}"
+MOCK
+chmod +x "$TMP/wrong-hash-tools/sha256sum"
+if PATH="$TMP/wrong-hash-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE" > "$TMP/wrong-hash.log" 2>&1; then
+  fail 'builder accepted a checksum that does not match the staged archive'
+fi
+grep -Fq 'Portable archive checksum creation or verification failed' "$TMP/wrong-hash.log" ||
+  fail 'missing mismatched checksum diagnostic'
+cmp -s -- "$ARCHIVE" "$TMP/known-good.tar.gz" ||
+  fail 'mismatched checksum replaced a valid archive'
+cmp -s -- "$ARCHIVE.sha256" "$TMP/known-good.sha256" ||
+  fail 'mismatched checksum replaced a valid checksum'
+[[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
+  fail 'mismatched checksum left an output staging directory'
+
 # An exact allowlist prevents accidental inclusion of secrets or Git metadata.
 tar -tzf "$ARCHIVE" | grep -v '/$' | sort > "$TMP/actual"
 cat > "$TMP/expected" <<'EXPECTED'
