@@ -50,6 +50,16 @@ for src in "$@"; do
     echo "Backup failed: not a regular file: $src" >&2
     exit 1
   fi
+  # Duplicate inputs would produce repeated manifest records. Such a
+  # snapshot could be marked complete but would fail strict verification.
+  occurrences=0
+  for other in "$@"; do
+    [[ $src == "$other" ]] && ((occurrences += 1))
+  done
+  if ((occurrences != 1)); then
+    echo "Backup failed: duplicate source: $src" >&2
+    exit 1
+  fi
 done
 
 : > "$backup_dir/present.txt"
