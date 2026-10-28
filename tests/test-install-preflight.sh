@@ -9,7 +9,7 @@ trap 'rm -rf -- "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 mkdir -p "$TMP/source" "$TMP/mock-bin"
-cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-smart.sh" \
+cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-health.sh" "$ROOT/disk-watch-smart.sh" \
    "$ROOT/disk-watch.service" "$ROOT/disk-watch.timer" "$TMP/source/"
 mkdir -p "$TMP/source/scripts"
 cp "$ROOT/scripts/backup-installed.sh" "$ROOT/scripts/check-config.sh" \
