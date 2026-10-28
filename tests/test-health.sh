@@ -73,7 +73,7 @@ grep -Fq 'Snapshots: 1' "$TMP/out" || fail 'snapshot count wrong'
 [[ $(wc -l < "$TMP/calls") -eq 1 ]] || fail 'cached command ran smartctl'
 # Add a second drive, verify history filtering, unavailable fields and date range.
 export SMART_SCENARIO=ata
-bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" > "$TMP/out"
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 grep -Fq $'ATA-TEST-0002\tATA test disk\tpassed\t37\t4512\tunavailable\t3' "$TMP/out" || fail 'ATA parsing wrong'
 bash "$script" disks --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/out") -eq 3 ]] || fail 'inventory should contain header plus two disks'
