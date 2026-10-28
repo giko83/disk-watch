@@ -193,7 +193,7 @@ cat > "$TMP/mock-cp/cp" <<'MOCK_CP'
 #!/usr/bin/env bash
 dest=${@: -1}
 if [[ $dest == */etc/systemd/system/disk-watch.service ]]; then
-  printf 'partial copy\\n' > "$dest"
+  printf 'partial copy\n' > "$dest"
   exit 77
 fi
 exec "$REAL_CP" "$@"
