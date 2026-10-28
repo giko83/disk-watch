@@ -46,6 +46,23 @@ make_snapshot hash-extra
 printf 'garbage\n' >> "$TMP/backups/hash-extra/SHA256SUMS"
 reject "$TMP/backups/hash-extra" 'extra checksum entry'
 
+# Unlisted payloads must never be accepted as part of a verified snapshot.
+# Include hidden files, symlinks and files nested in unexpected directories.
+make_snapshot unlisted-hidden
+printf 'unexpected\\n' > "$TMP/backups/unlisted-hidden/.hidden"
+reject "$TMP/backups/unlisted-hidden" 'unlisted hidden file'
+grep -Fq 'unlisted snapshot entry' "$TMP/err" ||
+  fail 'missing unlisted hidden file diagnostic'
+
+make_snapshot unlisted-symlink
+ln -s /etc/passwd "$TMP/backups/unlisted-symlink/alias"
+reject "$TMP/backups/unlisted-symlink" 'unlisted symlink'
+
+make_snapshot unlisted-nested
+mkdir -p "$TMP/backups/unlisted-nested/other"
+printf 'unexpected\\n' > "$TMP/backups/unlisted-nested/other/file"
+reject "$TMP/backups/unlisted-nested" 'unlisted nested file'
+
 make_snapshot absent
 printf 'should not exist\n' > "$TMP/backups/absent$missing"
 reject "$TMP/backups/absent" 'copied file declared absent'
