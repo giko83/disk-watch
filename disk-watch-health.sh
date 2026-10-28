@@ -64,7 +64,7 @@ if ((refresh)); then
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
   echo "SMART read from $device may wake disk" >&2
   raw=$(smartctl -a -- "$device" 2>&1) || :
-  grep -Eq '(SMART|NVMe|Device Model|Model Number)' <<<"$raw" || { echo 'No readable SMART report; snapshot not saved' >&2; exit 1; }
+  grep -Eq '^(Model Number|Device Model|SMART overall-health self-assessment test result|SMART Health Status|SMART/Health Information)' <<<"$raw" || { echo 'No readable SMART report; snapshot not saved' >&2; exit 1; }
   model=$(awk -F: '/^(Device Model|Model Number):/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
   serial=$(awk -F: '/^Serial Number:/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
   id=$device
@@ -101,32 +101,56 @@ if ((refresh)); then
   flock -u 9
   echo "Saved SMART snapshot for $id; reported health: $health (not a guarantee of reliability)" >&2
 fi
-if [[ $action == status && $format == text ]]; then
-  echo 'Disk Watch cached status (no device access)'
-  if [[ -s "$state/kernel.cursor" ]]; then echo 'Journal cursor: available'
-  else echo 'Journal cursor: unavailable'; fi
-fi
-if [[ $format == tsv ]]; then printf '%s\n' "$header"
-elif [[ $action != status ]]; then printf '%s\n' "$header"; fi
-if [[ ! -s $db ]]; then
-  if [[ $format == text ]]; then
-    echo 'SMART history: unavailable (no saved snapshots).'
-    echo 'To collect explicitly: health --device /dev/DEVICE --refresh --wake-ok'
+# Everything after the optional explicit refresh is read-only and disk-safe.
+# For status, TSV is key/value data rather than the snapshot row schema.
+if [[ $action == status ]]; then
+  if [[ $format == tsv ]]; then
+    printf 'metric\tvalue\n'
+    if [[ -s "$state/kernel.cursor" ]]; then printf 'journal_cursor\tavailable\n'
+    else printf 'journal_cursor\tunavailable\n'; fi
+  else
+    echo 'Disk Watch cached status (no device access)'
+    if [[ -s "$state/kernel.cursor" ]]; then echo 'Journal cursor: available'
+    else echo 'Journal cursor: unavailable'; fi
+  fi
+  if [[ -s "$db" ]]; then
+    stats=$(awk -F '\t' 'NR>1 && NF>=13 {n++; a[$3]=1; last=$1} END {for(k in a) d++; printf "%d\t%d\t%s", n,d,(last==""?"unavailable":last)}' "$db")
+  else stats=$'0\t0\tunavailable'; fi
+  IFS=$'\t' read -r n d last <<<"$stats"
+  if [[ $format == tsv ]]; then
+    printf 'snapshots\t%s\ndisks\t%s\nlast_snapshot\t%s\nlast_alert\tunavailable\n' "$n" "$d" "$last"
+  else
+    printf 'Snapshots: %s\nDisks with snapshots: %s\nLast snapshot: %s\n' "$n" "$d" "$last"
+    echo 'Last alert: unavailable (event history not yet persisted)'
   fi
   exit 0
 fi
+if [[ $format == tsv ]]; then printf '%s\n' "$header"; fi
+if [[ ! -s $db ]]; then
+  [[ $format != text ]] || echo 'SMART history: unavailable (no saved snapshots).'
+  exit 0
+fi
+# Format as compact records rather than a very wide TSV row in terminals.
+format_rows() {
+  if [[ $format == tsv ]]; then cat
+  else awk -F '\t' 'NF>=13 {
+    printf "Disk: %s (%s)\nLast seen: %s | SMART: %s | Last test: %s\n", $3,$4,$1,$5,$13;
+    printf "Temp: %s C | Hours: %s | Reallocated: %s | Pending: %s\n", $6,$7,$8,$9;
+    printf "Media errors: %s | Written: %s GB | Wear: %s %% | Path: %s\n\n", $10,$11,$12,$2;
+  }'
+  fi
+}
+# No smartctl/journalctl calls below this line. Column 3 uses a firmware
+# serial if available; otherwise the explicit path. Never infer health from
+# fields marked unavailable.
 case $action in
- status)
-   awk -F '\t' 'NR>1 && NF>=13 {n++; a[$3]=1; last=$1} END {for(k in a) d++; printf "Snapshots: %d\nDisks with snapshots: %d\nLast snapshot: %s\n",n,d,(last==""?"unavailable":last)}' "$db"
-   [[ $format != text ]] || echo 'Last alert: unavailable (event history not yet persisted)'
-   ;;
  disks|health)
-   awk -F '\t' 'NR>1 && NF>=13 {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t $'\t' -k3,3
+   awk -F '\t' 'NR>1 && NF>=13 {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t $'\t' -k3,3 | format_rows
    ;;
  history)
-   awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db"
+   awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db" | format_rows
    ;;
  report)
-   awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db"
+   awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db" | format_rows
    ;;
 esac
