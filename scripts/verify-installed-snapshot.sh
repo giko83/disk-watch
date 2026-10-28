@@ -80,7 +80,7 @@ find "$snapshot" -mindepth 1 ! -type d -exec bash -c '
       .complete|present.txt|absent.txt|SHA256SUMS|\
       usr/local/sbin/disk-watch.sh|usr/local/sbin/disk-watch-smart.sh|\
       etc/systemd/system/disk-watch.service|etc/systemd/system/disk-watch.timer) ;;
-      *) printf "Snapshot verification failed: unlisted snapshot entry: %s\\n" "$rel" >&2; exit 1 ;;
+      *) printf "Snapshot verification failed: unlisted snapshot entry: %s\n" "$rel" >&2; exit 1 ;;
     esac
   done
 ' _ "$snapshot" {} + || fail 'unlisted or unreadable snapshot content'
