@@ -111,6 +111,14 @@ tar --format=gnu --sort=name --mtime='@0' --owner=0 --group=0 \
 # Write only the basename so the archive and sidecar remain verifiable
 # after moving both files together to a different directory.
 (cd -- "$OUTPUT_STAGE" && sha256sum -- "$OUTPUT_FILE" > "$OUTPUT_FILE.sha256")
+# Do not publish a bundle if a broken checksum tool exits successfully but
+# produces no digest, or if the staged digest does not verify the staged bytes.
+# A failure leaves any existing published archive and checksum untouched.
+if [[ ! -s "$OUTPUT_STAGE/$OUTPUT_FILE.sha256" ]] ||
+   ! (cd -- "$OUTPUT_STAGE" && sha256sum -c -- "$OUTPUT_FILE.sha256" >/dev/null); then
+  echo 'Portable archive checksum creation or verification failed' >&2
+  exit 1
+fi
 mv -f -- "$OUTPUT_STAGE/$OUTPUT_FILE" "$OUTPUT"
 mv -f -- "$OUTPUT_STAGE/$OUTPUT_FILE.sha256" "$OUTPUT.sha256"
 printf 'Portable archive created: %s\nSHA-256 checksum: %s.sha256\n' "$OUTPUT" "$OUTPUT"
