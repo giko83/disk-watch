@@ -26,6 +26,32 @@ cmp -s -- "$TMP/rebuild one/bundle.tar.gz" "$TMP/rebuild two/bundle.tar.gz" ||
 (cd -- "$TMP/rebuild one" && sha256sum -c bundle.tar.gz.sha256) >/dev/null ||
   fail 'reproducible archive checksum invalid'
 
+# A failing compression step must preserve an already published archive and
+# checksum, and must not leave staging artifacts or a partial new archive.
+cp -- "$ARCHIVE" "$TMP/known-good.tar.gz"
+cp -- "$ARCHIVE.sha256" "$TMP/known-good.sha256"
+mkdir -p "$TMP/failing-tools"
+cat > "$TMP/failing-tools/gzip" <<'MOCK'
+#!/usr/bin/env bash
+cat > /dev/null
+exit 37
+MOCK
+chmod +x "$TMP/failing-tools/gzip"
+if PATH="$TMP/failing-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$ARCHIVE" > "$TMP/build-failure.log" 2>&1; then
+  fail 'builder succeeded despite failed compression'
+fi
+cmp -s -- "$ARCHIVE" "$TMP/known-good.tar.gz" ||
+  fail 'failed build replaced a valid archive'
+cmp -s -- "$ARCHIVE.sha256" "$TMP/known-good.sha256" ||
+  fail 'failed build replaced a valid checksum'
+if PATH="$TMP/failing-tools:$PATH" bash "$ROOT/scripts/build-portable.sh" "$TMP/failed-new.tar.gz" > "$TMP/new-build-failure.log" 2>&1; then
+  fail 'new archive build succeeded despite failed compression'
+fi
+[[ ! -e "$TMP/failed-new.tar.gz" && ! -e "$TMP/failed-new.tar.gz.sha256" ]] ||
+  fail 'failed build left a partial new artifact'
+[[ -z $(find "$TMP" -maxdepth 1 -name '.disk-watch-build.*' -print -quit) ]] ||
+  fail 'failed build left an output staging directory'
+
 # An exact allowlist prevents accidental inclusion of secrets or Git metadata.
 tar -tzf "$ARCHIVE" | grep -v '/$' | sort > "$TMP/actual"
 cat > "$TMP/expected" <<'EXPECTED'
