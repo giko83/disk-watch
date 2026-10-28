@@ -70,7 +70,14 @@ for target in "$OUTPUT" "$OUTPUT.sha256"; do
 done
 
 STAGE=$(mktemp -d)
-trap 'rm -rf -- "$STAGE"' EXIT
+OUTPUT_STAGE=''
+cleanup() {
+  rm -rf -- "$STAGE"
+  if [[ -n "$OUTPUT_STAGE" ]]; then
+    rm -rf -- "$OUTPUT_STAGE"
+  fi
+}
+trap cleanup EXIT
 mkdir -p -- "$STAGE/disk-watch-portable/docs"
 for file in "${FILES[@]}"; do
   cp -- "$ROOT/$file" "$STAGE/disk-watch-portable/$file"
@@ -90,12 +97,18 @@ command -v sha256sum >/dev/null 2>&1 || {
 OUTPUT_DIR=$(dirname -- "$OUTPUT")
 OUTPUT_FILE=$(basename -- "$OUTPUT")
 mkdir -p -- "$OUTPUT_DIR"
+# Stage both artifacts beside the destination. Failed tar/gzip/hash generation
+# must not truncate a previously valid archive or checksum. Each final rename
+# is atomic on the same filesystem, but the archive/checksum pair is NOT atomic.
+OUTPUT_STAGE=$(mktemp -d -- "$OUTPUT_DIR/.disk-watch-build.XXXXXXXX")
 # Stable ordering, timestamp, ownership, permissions and gzip header make
 # repeated builds of identical source bytes reproducible across directories
 # and umasks. GNU tar and gzip are build-only tools, not runtime dependencies.
 tar --format=gnu --sort=name --mtime='@0' --owner=0 --group=0 \
-  --numeric-owner -cf - -C "$STAGE" disk-watch-portable | gzip -n > "$OUTPUT"
+  --numeric-owner -cf - -C "$STAGE" disk-watch-portable | gzip -n > "$OUTPUT_STAGE/$OUTPUT_FILE"
 # Write only the basename so the archive and sidecar remain verifiable
 # after moving both files together to a different directory.
-(cd -- "$OUTPUT_DIR" && sha256sum -- "$OUTPUT_FILE" > "$OUTPUT_FILE.sha256")
+(cd -- "$OUTPUT_STAGE" && sha256sum -- "$OUTPUT_FILE" > "$OUTPUT_FILE.sha256")
+mv -f -- "$OUTPUT_STAGE/$OUTPUT_FILE" "$OUTPUT"
+mv -f -- "$OUTPUT_STAGE/$OUTPUT_FILE.sha256" "$OUTPUT.sha256"
 printf 'Portable archive created: %s\nSHA-256 checksum: %s.sha256\n' "$OUTPUT" "$OUTPUT"
