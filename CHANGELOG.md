@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Run existing Bash syntax and eight unprivileged offline regression suites on pinned Ubuntu 22.04 and 24.04 GitHub Actions runners (rather than moving `ubuntu-latest`), with toolchain versions recorded. This expands CI compatibility coverage but does not validate Debian/Proxmox, hardware or live root rollback; no runtime dependency changes.
 - Make locally built portable source archives byte-reproducible across build directories and umasks using normalized GNU tar/gzip metadata and file permissions; add an offline byte-comparison regression. GNU tar and gzip are build-only prerequisites, with no runtime change or published release.
 - Add an opt-in offline restore rehearsal into a private, empty sandbox, re-verifying snapshot integrity and copied file contents/modes without touching installed paths, systemd or host state. This does not provide live rollback.
 - Add a read-only recovery planner for verified pre-install snapshots: list four fixed paths to restore or review without copying, deleting, changing services or touching host state. This is not a root-level rollback or transactional update.

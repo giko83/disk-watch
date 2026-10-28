@@ -61,6 +61,10 @@ On Debian, Ubuntu and Proxmox, the existing systemd timer installation remains s
 
 Use an account with journal access and a writable state directory. Cron's environment can differ from an interactive shell; specify absolute paths and configure the chosen notification transport. For paths containing spaces, quote them appropriately. The built-in `flock` prevents overlapping scans of the same state directory.
 
+## Offline compatibility coverage
+
+CI checks the portable CLI, archive build/extraction and existing mocked regressions on Ubuntu 22.04 and 24.04 LTS runners, exercising the Bash and GNU utilities shipped with each image. Both jobs are unprivileged and do not read host journals or disks. Locally, run `for test_script in tests/test-*.sh; do bash "$test_script"; done` from the repository root to repeat the offline suites. The runner matrix is **not** a Debian or Proxmox certification; non-journald hosts, actual journal permissions, USB/SMART behavior and root-level installer/rollback still require separate validation. The CI matrix adds no runtime dependency.
+
 ## Limits and safe behavior
 
 - No SMART test is started by `check`; SMART remains separately integrated through `smartd`.
