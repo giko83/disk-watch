@@ -77,6 +77,8 @@ bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" -
 grep -Fq $'ATA-TEST-0002\tATA test disk\tpassed\t37\t4512\tunavailable\t3' "$TMP/out" || fail 'ATA parsing wrong'
 bash "$script" disks --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/out") -eq 3 ]] || fail 'inventory should contain header plus two disks'
+bash "$script" health --device NVME-TEST-0001 --state-dir "$st" --format tsv > "$TMP/out"
+[[ $(wc -l < "$TMP/out") -eq 2 ]] || fail 'cached health filter did not select one disk'
 bash "$script" history --device NVME-TEST-0001 --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/out") -eq 2 ]] || fail 'serial filter failed'
 bash "$script" history --device /dev/zero --state-dir "$st" --format tsv > "$TMP/out"
