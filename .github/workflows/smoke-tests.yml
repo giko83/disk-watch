@@ -27,7 +27,7 @@ jobs:
           sha256sum --version | head -n 1
       - name: Check Bash syntax
         run: |
-          for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh tests/*.sh; do
+          for script in disk-watch.sh disk-watch-health.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh tests/*.sh; do
             bash -n "$script"
           done
           sh -n disk-watch-smart.sh
@@ -41,3 +41,4 @@ jobs:
           bash tests/test-backup.sh
           bash tests/test-verify-snapshot.sh
           bash tests/test-update.sh
+          bash tests/test-health.sh

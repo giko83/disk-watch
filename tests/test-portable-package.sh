@@ -58,9 +58,11 @@ cat > "$TMP/expected" <<'EXPECTED'
 disk-watch-portable/CHANGELOG.md
 disk-watch-portable/LICENSE
 disk-watch-portable/README.md
+disk-watch-portable/disk-watch-health.sh
 disk-watch-portable/disk-watch.conf.example
 disk-watch-portable/disk-watch.sh
 disk-watch-portable/docs/ROADMAP.md
+disk-watch-portable/docs/health.md
 disk-watch-portable/docs/operations.md
 disk-watch-portable/docs/portable.md
 disk-watch-portable/docs/smart-usb-standby.md
@@ -72,6 +74,7 @@ fi
 mkdir -p "$TMP/unpacked"
 tar -xzf "$ARCHIVE" -C "$TMP/unpacked"
 PKG="$TMP/unpacked/disk-watch-portable"
+[[ -x "$PKG/disk-watch-health.sh" ]] || fail "packaged health helper is not executable"
 [[ -x "$PKG/disk-watch.sh" ]] || fail 'packaged script is not executable'
 bash "$PKG/disk-watch.sh" --help | grep -Fq 'check' || fail 'packaged CLI help failed'
 

@@ -23,11 +23,13 @@ done
 # Explicit allowlist: never package local credentials, state, or .git metadata.
 FILES=(
   disk-watch.sh
+  disk-watch-health.sh
   disk-watch.conf.example
   README.md
   LICENSE
   CHANGELOG.md
   docs/portable.md
+  docs/health.md
   docs/ROADMAP.md
   docs/operations.md
   docs/smart-usb-standby.md
@@ -86,7 +88,7 @@ for file in "${FILES[@]}"; do
   chmod 644 -- "$STAGE/disk-watch-portable/$file"
 done
 chmod 755 -- "$STAGE/disk-watch-portable" "$STAGE/disk-watch-portable/docs" \
-  "$STAGE/disk-watch-portable/disk-watch.sh"
+  "$STAGE/disk-watch-portable/disk-watch.sh" "$STAGE/disk-watch-portable/disk-watch-health.sh"
 
 # Checksums are a build-time convenience, not a new runtime requirement.
 # Fail before packaging if the host cannot generate a checksum.

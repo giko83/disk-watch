@@ -72,3 +72,7 @@ CI checks the portable CLI, archive build/extraction and existing mocked regress
 - Journal read errors cause a failure and leave the cursor unchanged. **Journal rotation or an expired cursor can still create a gap that the current monitor does not always detect**; review the kernel journal and reinitialize the cursor only deliberately.
 - The portable workflow does not update installed production services. Keep configs and tokens out of Git and avoid using a world-readable state directory.
 - Formal release distribution, additional platform compatibility tests and any non-journald backend remain tracked under [issue #18](https://github.com/giko83/disk-watch/issues/18).
+
+## Cached health reports in portable mode
+
+The portable source archive includes `disk-watch-health.sh`. Run `bash disk-watch.sh status --state-dir "$HOME/.local/state/disk-watch"` or `bash disk-watch.sh disks --state-dir "$HOME/.local/state/disk-watch"` without contacting disks. An explicit `health --device /dev/DEVICE --refresh --wake-ok` operation requires optional `smartctl` and device permissions, and may wake a sleeping disk. See [health guide](health.md).
