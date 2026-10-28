@@ -87,6 +87,23 @@ if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.symlink" "$TMP/
 fi
 [[ ! -e "$TMP/backups/backup.symlink/.complete" ]] || fail 'symlink snapshot marked complete'
 
+# A regular file reached through a symlinked parent must also be refused
+# before creating manifests. Test a nested descendant, not just a leaf link.
+mkdir -p "$TMP/live/actual-parent/nested"
+printf '%s' 'private source' > "$TMP/live/actual-parent/nested/file"
+ln -s "$TMP/live/actual-parent" "$TMP/live/alias-parent"
+mkdir -m 700 "$TMP/backups/backup.parent-link"
+if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.parent-link" \
+  "$TMP/live/alias-parent/nested/file" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'source with symlinked parent accepted'
+fi
+grep -Fq 'refusing symlinked source parent' "$TMP/err" || \
+  fail 'missing symlinked parent diagnostic'
+[[ -z $(find "$TMP/backups/backup.parent-link" -mindepth 1 -print -quit) ]] || \
+  fail 'symlinked parent created snapshot contents'
+grep -Fxq 'private source' "$TMP/live/actual-parent/nested/file" || \
+  fail 'source changed after symlinked parent rejection'
+
 mkdir -p "$TMP/mock-bin"
 cat > "$TMP/mock-bin/cp" <<'MOCK'
 #!/usr/bin/env bash
