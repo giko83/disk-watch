@@ -46,6 +46,16 @@ for src in "$@"; do
     echo "Backup failed: refusing symlink $src" >&2
     exit 1
   }
+  # A regular leaf can still be reached through a symlinked parent. Do not
+  # follow such aliases when capturing the previously installed files.
+  parent=$(dirname -- "$src")
+  while [[ $parent != / ]]; do
+    if [[ -L $parent ]]; then
+      echo "Backup failed: refusing symlinked source parent: $parent" >&2
+      exit 1
+    fi
+    parent=$(dirname -- "$parent")
+  done
   if [[ -e "$src" && ! -f "$src" ]]; then
     echo "Backup failed: not a regular file: $src" >&2
     exit 1
