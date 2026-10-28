@@ -62,6 +62,7 @@ disk-watch-portable/disk-watch.conf.example
 disk-watch-portable/disk-watch-health.sh
 disk-watch-portable/disk-watch.sh
 disk-watch-portable/docs/ROADMAP.md
+disk-watch-portable/docs/health.md
 disk-watch-portable/docs/operations.md
 disk-watch-portable/docs/portable.md
 disk-watch-portable/docs/smart-usb-standby.md
