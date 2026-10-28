@@ -142,6 +142,18 @@ bash tests/test-verify-snapshot.sh
 
 The tests use temporary directories and mock `journalctl`, `curl`, `sendmail`, and `logger`; they do **not** access real disks, send Telegram messages, send real email, or change systemd services. The mail-transport tests cover the notification test command, I/O alert retry after a failed `sendmail`, and SMART alert formatting. Portable tests cover quoted paths, CLI precedence, one-shot checks and failed journal reads. The archive test builds the portable package, verifies its SHA-256 sidecar and rejection of tampering, checks its exact allowlist and executes an offline init/check from the extracted tree. Installer preflight tests run without root and verify missing-file/syntax diagnostics without calling systemctl. GitHub Actions runs the same checks on pull requests. Current coverage includes journal cursor initialization and idempotence (re-running `init` preserves an existing cursor), preserving pending alerts after failed delivery **or missing/invalid Telegram credentials**, successful I/O alert delivery, clean scans, non-fatal local logger failure after successful delivery, and SMART alert content/failure handling; it is not an end-to-end hardware test.
 
+## Offline compatibility checks
+
+GitHub Actions runs the Bash syntax checks and all eight mocked offline test suites on **Ubuntu 22.04 and Ubuntu 24.04** (two pinned LTS runner images, rather than the moving `ubuntu-latest`). Both jobs must pass before a PR is considered verified. The jobs run unprivileged, use no real SMART devices, host journal, systemd service, or credentials, and print the Bash/GNU tar/gzip/coreutils versions used. To repeat the same tests locally without touching disks or services:
+
+```sh
+for script in disk-watch.sh install.sh update.sh scripts/*.sh tests/*.sh; do bash -n "$script"; done
+sh -n disk-watch-smart.sh
+for test_script in tests/test-*.sh; do bash "$test_script"; done
+```
+
+These are **Ubuntu runner compatibility checks**, not proof of Debian, Proxmox, real hardware, root installation, or a non-journald backend. No runtime prerequisites or production configurations change. See [portable compatibility notes](docs/portable.md) and [issue #33](https://github.com/giko83/disk-watch/issues/33).
+
 ## Roadmap and contributing
 
 Development priorities are tracked as [GitHub issues](https://github.com/giko83/disk-watch/issues). See the [issue-linked roadmap](docs/ROADMAP.md) for **16 proposed features**, their implementation order, acceptance criteria, and the project's minimal-dependency design principles.

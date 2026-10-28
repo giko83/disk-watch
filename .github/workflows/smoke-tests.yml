@@ -10,9 +10,21 @@ permissions:
 
 jobs:
   shell-tests:
-    runs-on: ubuntu-latest
+    name: Offline smoke / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
     steps:
       - uses: actions/checkout@v4
+      - name: Verify unprivileged offline toolchain
+        run: |
+          test "$(id -u)" -ne 0
+          bash --version | head -n 1
+          tar --version | head -n 1
+          gzip --version | head -n 1
+          sha256sum --version | head -n 1
       - name: Check Bash syntax
         run: |
           for script in disk-watch.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh tests/*.sh; do
