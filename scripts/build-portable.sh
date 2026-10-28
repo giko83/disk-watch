@@ -50,6 +50,25 @@ for file in "${FILES[@]}"; do
   fi
 done
 
+# Existing output targets must be ordinary files, never pipes, devices or
+# directories. Also refuse hard links to packaged sources or this builder:
+# truncating an archive or checksum must not destroy its own input.
+# This is a preflight guard, not protection against concurrent path races.
+for target in "$OUTPUT" "$OUTPUT.sha256"; do
+  if [[ -e "$target" && ! -f "$target" ]]; then
+    echo "Refusing non-regular portable archive output: $target" >&2
+    exit 1
+  fi
+  if [[ -e "$target" ]]; then
+    for source in "${FILES[@]}" scripts/build-portable.sh; do
+      if [[ "$target" -ef "$ROOT/$source" ]]; then
+        echo "Refusing portable archive output alias of source: $target ($source)" >&2
+        exit 1
+      fi
+    done
+  fi
+done
+
 STAGE=$(mktemp -d)
 trap 'rm -rf -- "$STAGE"' EXIT
 mkdir -p -- "$STAGE/disk-watch-portable/docs"

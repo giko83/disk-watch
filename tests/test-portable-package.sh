@@ -140,6 +140,42 @@ grep -Fq 'Refusing symlink in portable archive output:' "$TMP/checksum-symlink.l
 [[ ! -e "$TMP/linked-checksum.tar.gz" ]] ||
   fail 'builder created an archive with a rejected checksum output'
 
+# Refuse a FIFO before writing to avoid blocked archive output.
+mkfifo -- "$TMP/fifo-output.tar.gz"
+if timeout 5 bash "$ROOT/scripts/build-portable.sh" "$TMP/fifo-output.tar.gz" > "$TMP/fifo.log" 2>&1; then
+  fail 'builder accepted a FIFO output'
+fi
+grep -Fq 'Refusing non-regular portable archive output:' "$TMP/fifo.log" ||
+  fail 'missing non-regular output diagnostic'
+[[ -p "$TMP/fifo-output.tar.gz" && ! -e "$TMP/fifo-output.tar.gz.sha256" ]] ||
+  fail 'builder modified FIFO or created a checksum after rejection'
+
+# Hard links to allowlisted sources are regular files but cannot be truncated.
+# Use an isolated extracted fixture, never a live repository file.
+rm -- "$FIXTURE/docs"
+mv -- "$TMP/outside-docs" "$FIXTURE/docs"
+ln -- "$FIXTURE/README.md" "$TMP/source-hardlink.tar.gz"
+if bash "$FIXTURE/scripts/build-portable.sh" "$TMP/source-hardlink.tar.gz" > "$TMP/hardlink.log" 2>&1; then
+  fail 'builder accepted an archive output hardlinked to a source'
+fi
+grep -Fq 'Refusing portable archive output alias of source:' "$TMP/hardlink.log" ||
+  fail 'missing source-hardlink output diagnostic'
+cmp -s -- "$FIXTURE/README.md" "$PKG/README.md" ||
+  fail 'builder modified an allowlisted source through an archive hardlink'
+[[ ! -e "$TMP/source-hardlink.tar.gz.sha256" ]] ||
+  fail 'builder created checksum for a rejected source-hardlink archive'
+
+ln -- "$FIXTURE/README.md" "$TMP/source-checksum.tar.gz.sha256"
+if bash "$FIXTURE/scripts/build-portable.sh" "$TMP/source-checksum.tar.gz" > "$TMP/checksum-hardlink.log" 2>&1; then
+  fail 'builder accepted a checksum output hardlinked to a source'
+fi
+grep -Fq 'Refusing portable archive output alias of source:' "$TMP/checksum-hardlink.log" ||
+  fail 'missing source-hardlink checksum diagnostic'
+cmp -s -- "$FIXTURE/README.md" "$PKG/README.md" ||
+  fail 'builder modified an allowlisted source through a checksum hardlink'
+[[ ! -e "$TMP/source-checksum.tar.gz" ]] ||
+  fail 'builder created archive for a rejected source-hardlink checksum'
+
 # The checksum must detect corruption, not just exist.
 printf 'tampered' >> "$ARCHIVE"
 if (cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") > /dev/null 2>&1; then
