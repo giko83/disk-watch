@@ -85,6 +85,35 @@ bash "$PKG/disk-watch.sh" --config "$TMP/private config" --state-dir "$TMP/local
 [[ $(cat "$TMP/local state/kernel.cursor") == p1 ]] || fail 'packaged check did not advance cursor'
 grep -Fq 'I/O error, dev sdb' "$TMP/mail.body" || fail 'packaged check did not alert'
 
+# Refuse allowlisted symlinks: cp would otherwise follow them and silently
+# include private bytes outside the source tree. Exercise an isolated fixture.
+FIXTURE="$TMP/symlink source"
+mkdir -p "$FIXTURE/scripts"
+cp -a -- "$PKG/." "$FIXTURE/"
+cp -- "$ROOT/scripts/build-portable.sh" "$FIXTURE/scripts/build-portable.sh"
+printf 'PRIVATE_TEST_MARKER\\n' > "$TMP/outside-private-file"
+rm -- "$FIXTURE/README.md"
+ln -s -- "$TMP/outside-private-file" "$FIXTURE/README.md"
+if bash "$FIXTURE/scripts/build-portable.sh" "$TMP/forbidden.tar.gz" > "$TMP/symlink.log" 2>&1; then
+  fail 'builder accepted a symlinked allowlisted file'
+fi
+grep -Fq 'Refusing symlink in portable archive input: README.md' "$TMP/symlink.log" ||
+  fail 'missing symlinked file diagnostic'
+[[ ! -e "$TMP/forbidden.tar.gz" && ! -e "$TMP/forbidden.tar.gz.sha256" ]] ||
+  fail 'builder created an archive after rejecting a symlinked file'
+
+rm -- "$FIXTURE/README.md"
+cp -- "$PKG/README.md" "$FIXTURE/README.md"
+mv -- "$FIXTURE/docs" "$TMP/outside-docs"
+ln -s -- "$TMP/outside-docs" "$FIXTURE/docs"
+if bash "$FIXTURE/scripts/build-portable.sh" "$TMP/forbidden-docs.tar.gz" > "$TMP/docs-symlink.log" 2>&1; then
+  fail 'builder accepted a symlinked docs directory'
+fi
+grep -Fq 'Refusing symlink in portable archive input: docs/' "$TMP/docs-symlink.log" ||
+  fail 'missing symlinked docs directory diagnostic'
+[[ ! -e "$TMP/forbidden-docs.tar.gz" && ! -e "$TMP/forbidden-docs.tar.gz.sha256" ]] ||
+  fail 'builder created an archive after rejecting symlinked docs'
+
 # The checksum must detect corruption, not just exist.
 printf 'tampered' >> "$ARCHIVE"
 if (cd -- "$TMP" && sha256sum -c -- "portable build.tar.gz.sha256") > /dev/null 2>&1; then

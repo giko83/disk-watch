@@ -17,6 +17,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Reject symlinked allowlisted files and a symlinked `docs/` parent when building the portable archive, before creating output, so links cannot dereference private content from outside the source tree. Offline fixture tests cover both cases; build/runtime dependencies are unchanged.
 - Reject duplicate input source paths before creating pre-install snapshot manifests; previously a repeated path could yield a `.complete` snapshot that the strict verifier would reject. No runtime dependencies or live-host changes.
 - Clean up only allowlisted files and empty directories created by a failed offline restore rehearsal, instead of leaving misleading partial sandbox output. Cleanup is best-effort and never touches the source snapshot or installed paths.
 - Fail read-only installer preflight if the snapshot verifier, restore planner or sandbox rehearsal helper is missing, empty or Bash-syntax-invalid; this does not prove root-level recovery or change installed files.

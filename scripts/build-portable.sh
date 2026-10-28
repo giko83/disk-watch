@@ -22,7 +22,18 @@ FILES=(
   docs/operations.md
   docs/smart-usb-standby.md
 )
+# A symlinked source could silently dereference a private file outside the
+# checkout into this otherwise allowlisted public archive. Refuse both file
+# symlinks and a symlinked docs parent before creating any output.
+if [[ -L "$ROOT/docs" ]]; then
+  echo 'Refusing symlink in portable archive input: docs/' >&2
+  exit 1
+fi
 for file in "${FILES[@]}"; do
+  if [[ -L "$ROOT/$file" ]]; then
+    echo "Refusing symlink in portable archive input: $file" >&2
+    exit 1
+  fi
   if [[ ! -f "$ROOT/$file" ]]; then
     echo "Missing portable archive input: $file" >&2
     exit 1
