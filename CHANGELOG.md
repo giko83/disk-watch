@@ -44,7 +44,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
-- Mock `sha256sum` returning success with no output: confirm a clear failure, unchanged existing archive/checksum, no new partial artifacts and removal of temporary staging (offline, no root or disks).
+- Mock `sha256sum` returning success with an empty digest or an incorrect non-empty digest: confirm clear failures, unchanged existing archive/checksum, no new partial artifacts and removal of temporary staging (offline, no root or disks).
 - Exercise FIFO archive output refusal with a bounded offline run and hardlinked archive/checksum outputs against an isolated source fixture; verify diagnostics, unchanged source bytes and no partial companion files.
 - Exercise symlinked archive and checksum output paths with offline fixtures; assert a clear refusal, unchanged target contents and no partial companion artifact.
 - Add an offline duplicate-source backup regression that asserts a clear diagnostic and an untouched private snapshot directory.
