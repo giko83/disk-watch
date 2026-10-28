@@ -17,6 +17,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Refuse pre-existing symlinks at either portable archive or `.sha256` output path before writing, avoiding accidental clobbering of symlink targets. Use a trusted output directory; this best-effort check does not eliminate concurrent path-replacement races. No new build or runtime dependency.
 - Reject symlinked allowlisted files and a symlinked `docs/` parent when building the portable archive, before creating output, so links cannot dereference private content from outside the source tree. Offline fixture tests cover both cases; build/runtime dependencies are unchanged.
 - Reject duplicate input source paths before creating pre-install snapshot manifests; previously a repeated path could yield a `.complete` snapshot that the strict verifier would reject. No runtime dependencies or live-host changes.
 - Clean up only allowlisted files and empty directories created by a failed offline restore rehearsal, instead of leaving misleading partial sandbox output. Cleanup is best-effort and never touches the source snapshot or installed paths.
@@ -36,6 +37,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Exercise symlinked archive and checksum output paths with offline fixtures; assert a clear refusal, unchanged target contents and no partial companion artifact.
 - Add an offline duplicate-source backup regression that asserts a clear diagnostic and an untouched private snapshot directory.
 - Simulate a mid-rehearsal copy failure after an earlier successful copy; assert an empty sandbox, a diagnostic and unchanged snapshot hashes (offline, no root or hardware).
 - Exercise missing and syntactically broken recovery helpers in unprivileged installer preflight fixtures; confirm no systemctl invocation. CI also checks the helper scripts directly with Bash syntax validation.

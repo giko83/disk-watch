@@ -10,6 +10,16 @@ if (($# > 1)); then
 fi
 OUTPUT=${1:-"$ROOT/dist/disk-watch-portable.tar.gz"}
 
+# A pre-existing output symlink could redirect archive/checksum writes to an
+# unrelated file. Fail closed before staging or writing either artifact.
+# Use a trusted output directory: this is not an atomic race-proof guard.
+for target in "$OUTPUT" "$OUTPUT.sha256"; do
+  if [[ -L "$target" ]]; then
+    echo "Refusing symlink in portable archive output: $target" >&2
+    exit 1
+  fi
+done
+
 # Explicit allowlist: never package local credentials, state, or .git metadata.
 FILES=(
   disk-watch.sh
