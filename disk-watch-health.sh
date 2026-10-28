@@ -146,7 +146,16 @@ format_rows() {
 # fields marked unavailable.
 case $action in
  disks|health)
-   awk -F '\t' 'NR>1 && NF>=13 {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t $'\t' -k3,3 | format_rows
+   awk -F '\t' -v wanted="$device" 'NR>1 && NF>=13 && (wanted=="" || $2==wanted || $3==wanted) {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t 
+   ;;
+ history)
+   awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db" | format_rows
+   ;;
+ report)
+   awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db" | format_rows
+   ;;
+esac
+\t' -k3,3 | format_rows
    ;;
  history)
    awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db" | format_rows
