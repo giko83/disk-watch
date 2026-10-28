@@ -34,12 +34,31 @@ sandbox_real=$(cd -- "$sandbox" && pwd -P) || fail 'cannot resolve sandbox direc
 [[ $sandbox_real != "$snapshot_real" && $sandbox_real != "$snapshot_real"/* ]] ||
   fail 'sandbox must be outside the snapshot directory'
 
+# Once copying begins, a failure must not leave misleading partial output.
+# Only paths created in this previously empty private sandbox are removed;
+# never remove the sandbox itself, source snapshot, or any installed host path.
+created_files=()
+cleanup_failed_rehearsal() {
+  local status=$?
+  ((status == 0)) && return 0
+  local file dir
+  for file in "${created_files[@]}"; do
+    rm -f -- "$file" || true
+  done
+  for dir in /usr/local/sbin /usr/local /usr /etc/systemd/system /etc/systemd /etc; do
+    rmdir -- "$sandbox$dir" 2>/dev/null || true
+  done
+  echo 'Restore rehearsal failed: attempted cleanup of partial sandbox files; inspect sandbox before reuse.' >&2
+}
+trap cleanup_failed_rehearsal EXIT
+
 count=0
 for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-smart.sh \
             /etc/systemd/system/disk-watch.service /etc/systemd/system/disk-watch.timer; do
   if grep -Fxq -- "$path" "$snapshot/present.txt"; then
     mkdir -p -- "$(dirname -- "$sandbox$path")" ||
       fail "cannot create sandbox directory for $path"
+    created_files+=("$sandbox$path")
     cp -p -- "$snapshot$path" "$sandbox$path" ||
       fail "cannot copy $path (sandbox may be incomplete)"
     cmp -s -- "$snapshot$path" "$sandbox$path" ||

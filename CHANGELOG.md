@@ -16,6 +16,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Add portable one-shot `check` command (alias of `scan`) and CLI `--config`/`--state-dir` overrides with environment-variable fallbacks. This does not require installation or a systemd timer when the invoking user can read the kernel journal.
 
 ### Fixed
+- Clean up only allowlisted files and empty directories created by a failed offline restore rehearsal, instead of leaving misleading partial sandbox output. Cleanup is best-effort and never touches the source snapshot or installed paths.
 - Fail read-only installer preflight if the snapshot verifier, restore planner or sandbox rehearsal helper is missing, empty or Bash-syntax-invalid; this does not prove root-level recovery or change installed files.
 - Reject unlisted snapshot files, hidden entries, symlinks and special files during read-only recovery verification; only four fixed installed paths and metadata files are eligible. No live paths or services are touched.
 - Reject offline restore rehearsal destinations nested inside the source snapshot (including symlinked parent aliases) before any copy, preserving backup isolation without adding dependencies or touching live paths.
@@ -32,6 +33,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 - Treat local syslog logging failures as non-fatal after successful I/O alert delivery, so the journal cursor advances and the same event is not resent solely because `logger` failed.
 
 ### Tests
+- Simulate a mid-rehearsal copy failure after an earlier successful copy; assert an empty sandbox, a diagnostic and unchanged snapshot hashes (offline, no root or hardware).
 - Exercise missing and syntactically broken recovery helpers in unprivileged installer preflight fixtures; confirm no systemctl invocation. CI also checks the helper scripts directly with Bash syntax validation.
 - Add offline snapshot-verifier regressions for hidden extra files, unlisted symlinks and unexpected nested files, without root, hardware or network.
 - Cover direct and symlink-aliased nested rehearsal sandboxes, asserting clear rejection and unchanged snapshot contents with offline fixtures.

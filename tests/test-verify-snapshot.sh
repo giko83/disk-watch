@@ -185,6 +185,32 @@ grep -Fq 'sandbox must be outside the snapshot directory' "$TMP/err" ||
 [[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_nested" ]] ||
   fail 'nested rehearsal modified source snapshot files'
 
+# A failed copy after an earlier successful copy must leave no partial files
+# or directories in the private sandbox; the verified source stays unchanged.
+mkdir -m 700 "$TMP/reject-copy"
+mkdir -p "$TMP/mock-cp"
+cat > "$TMP/mock-cp/cp" <<'MOCK_CP'
+#!/usr/bin/env bash
+dest=${@: -1}
+if [[ $dest == */etc/systemd/system/disk-watch.service ]]; then
+  printf 'partial copy\n' > "$dest"
+  exit 77
+fi
+exec "$REAL_CP" "$@"
+MOCK_CP
+chmod 755 "$TMP/mock-cp/cp"
+before_failed_copy=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+if REAL_CP=$(command -v cp) PATH="$TMP/mock-cp:$PATH" rehearse "$TMP/backups/valid" "$TMP/reject-copy" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'simulated copy failure was accepted'
+fi
+grep -Fq 'cannot copy' "$TMP/err" || fail 'copy failure diagnostic missing'
+grep -Fq 'attempted cleanup of partial sandbox files' "$TMP/err" ||
+  fail 'copy failure cleanup diagnostic missing'
+[[ -z $(find "$TMP/reject-copy" -mindepth 1 -print -quit) ]] ||
+  fail 'failed copy left partial sandbox contents'
+[[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_failed_copy" ]] ||
+  fail 'failed rehearsal changed the source snapshot'
+
 mkdir -m 700 "$TMP/reject-tampered"
 if rehearse "$TMP/backups/tampered" "$TMP/reject-tampered" > "$TMP/out" 2> "$TMP/err"; then
   fail 'tampered snapshot was rehearsed'
