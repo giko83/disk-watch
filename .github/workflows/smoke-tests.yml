@@ -42,3 +42,37 @@ jobs:
           bash tests/test-verify-snapshot.sh
           bash tests/test-update.sh
           bash tests/test-health.sh
+
+  debian-offline:
+    name: Offline smoke / Debian ${{ matrix.debian }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        debian: ['12', '13']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unprivileged, network-isolated Debian smoke tests
+        run: |
+          docker run --rm --network none --read-only \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
+            --workdir /src --env HOME=/tmp \
+            "debian:${{ matrix.debian }}" \
+            bash -c '
+              set -euo pipefail
+              test "$(id -u)" -ne 0
+              for tool in bash tar gzip sha256sum flock grep awk diff find mktemp timeout; do
+                command -v "$tool" >/dev/null || { echo "Missing Debian tool: $tool" >&2; exit 1; }
+              done
+              bash --version | head -n 1
+              for script in disk-watch.sh disk-watch-health.sh install.sh update.sh scripts/build-portable.sh scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh tests/*.sh; do
+                bash -n "$script"
+              done
+              sh -n disk-watch-smart.sh
+              for test_script in tests/test-*.sh; do
+                bash "$test_script"
+              done
+            '
