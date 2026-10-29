@@ -151,7 +151,7 @@ bash "$script" history --device wwn:5000cca123456789 --state-dir "$st" --format 
 # Malformed WWNs must not become a guessed persistent identifier.
 export SMART_SCENARIO=wwn_invalid
 bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
-awk -F '\t' '$2=="/dev/null" {if ($3!="/dev/null") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'malformed WWN should fall back to device path'
+awk -F '\t' '$4=="Drive with malformed WWN" {if ($2!="/dev/null" || $3!="/dev/null") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'malformed WWN should fall back to device path'
 [[ $(wc -l < "$TMP/calls") -eq 8 ]] || fail 'unexpected WWN mock probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
