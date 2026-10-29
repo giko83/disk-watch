@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Extend CI to Debian 12 and 13 with unprivileged, network-disabled, read-only Docker test containers; run Bash/POSIX syntax checks and all nine existing offline mocked suites. Docker is a CI-only tool on the Ubuntu runner, not a runtime dependency. Container tests do not certify real Proxmox hardware, journal access or root-level rollback.
 - Add a lightweight `status`/`disks`/`health`/`history`/`report` CLI (#27) backed by local SMART snapshots. Read-only operations do not query disks or create state. A live `smartctl -a` snapshot requires an explicit device and both `--refresh --wake-ok`, since USB disks may spin up. Snapshot fields include health, temperature, hours, sector counters, NVMe written-GB estimate, wear and coarse self-test status where available; unsupported values remain `unavailable`. Includes portable packaging, offline mocked NVMe/ATA tests and documentation. Does not schedule SMART tests or automatically log alerts.
 
 - Run existing Bash syntax and eight unprivileged offline regression suites on pinned Ubuntu 22.04 and 24.04 GitHub Actions runners (rather than moving `ubuntu-latest`), with toolchain versions recorded. This expands CI compatibility coverage but does not validate Debian/Proxmox, hardware or live root rollback; no runtime dependency changes.

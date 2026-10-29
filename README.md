@@ -11,6 +11,8 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 **Initial public release:** based on a working homelab deployment. Not yet security-audited or broadly tested. This does not replace verified backups.
 
+**Offline CI compatibility:** GitHub Actions checks Bash syntax and the nine mocked regression suites on Ubuntu 22.04/24.04 and Debian 12/13. Debian tests run as an unprivileged user in a read-only container with networking disabled and no disk devices mounted; the runner pulls the image before isolation. This is not proof of live Proxmox, SMART hardware, journald permissions or root installer/rollback compatibility. Run the same suites locally with `for test_script in tests/test-*.sh; do bash "$test_script"; done`. No runtime dependencies change.
+
 ## Requirements
 
 Linux with Bash, a readable systemd kernel journal (`journalctl`), `grep`, `flock` and standard utilities. The **root installer** additionally requires GNU `stat` (coreutils) to check configuration metadata; standalone one-shot monitoring does not. **systemd timer installation is optional** for one-shot portable checks; `journalctl` is still required for the kernel-monitoring backend. Add curl for direct Telegram, smartmontools for SMART alerts, or working local sendmail for mail transport.

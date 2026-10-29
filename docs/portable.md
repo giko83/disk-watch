@@ -63,7 +63,7 @@ Use an account with journal access and a writable state directory. Cron's enviro
 
 ## Offline compatibility coverage
 
-CI checks the portable CLI, archive build/extraction and existing mocked regressions on Ubuntu 22.04 and 24.04 LTS runners, exercising the Bash and GNU utilities shipped with each image. Both jobs are unprivileged and do not read host journals or disks. Locally, run `for test_script in tests/test-*.sh; do bash "$test_script"; done` from the repository root to repeat the offline suites. The runner matrix is **not** a Debian or Proxmox certification; non-journald hosts, actual journal permissions, USB/SMART behavior and root-level installer/rollback still require separate validation. The CI matrix adds no runtime dependency.
+CI checks Bash syntax, portable CLI, archive build/extraction and all nine offline mocked regression suites on Ubuntu 22.04/24.04 LTS runners and official Debian 12/13 container images. The Debian jobs run on an Ubuntu 24.04 runner with `docker run --network none --read-only --user UID:GID`, a read-only checkout mount, no additional capabilities, and a writable private `/tmp`; no disk devices are mounted. The runner downloads the Debian image before the network-isolated tests start; the tests themselves need no root, external network, real journals or disks. Locally, run `for test_script in tests/test-*.sh; do bash "$test_script"; done` from the repository root. The matrix is **not** a live Proxmox certification: non-journald hosts, real journal permissions, USB/SMART behavior and root-level installer/rollback still require separate validation. No runtime dependencies are added.
 
 ## Limits and safe behavior
 
