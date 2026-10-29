@@ -113,4 +113,18 @@ done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe storage probed SMART hardware'
 [[ $(cat "$TMP/sentinel") == 'DO NOT TOUCH' ]] || fail 'symlink target was changed'
 [[ ! -e "$TMP/redirected/snapshots.tsv" ]] || fail 'symlinked directory received snapshot'
+# Ancestors of the state directory must also be checked before SMART access.
+# A symlinked parent is unsafe even when the state/health leaf is not linked.
+mkdir -p "$TMP/ancestor-target"
+ln -s "$TMP/ancestor-target" "$TMP/ancestor-link"
+printf 'NOT A DIRECTORY\n' > "$TMP/ancestor-file"
+for bad_state in "$TMP/ancestor-link/nested" "$TMP/ancestor-file/nested"; do
+  if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$bad_state" > "$TMP/out" 2>&1; then
+    fail "unsafe ancestor $bad_state was accepted"
+  fi
+  grep -Fq 'Unsafe SMART snapshot storage path' "$TMP/out" ||
+    fail "missing unsafe ancestor diagnostic for $bad_state"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe ancestor triggered SMART probe'
+[[ ! -e "$TMP/ancestor-target/nested/health/snapshots.tsv" ]] || fail 'symlink ancestor received snapshot'
 echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA metrics, history, filters, and unsafe storage rejection'
