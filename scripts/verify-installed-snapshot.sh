@@ -20,10 +20,20 @@ for name in .complete present.txt absent.txt SHA256SUMS; do
 done
 [[ $(cat -- "$snapshot/.complete") == complete ]] || fail 'invalid completion marker'
 
+# Older verified snapshots cover four paths; format 2 requires all five.
+# Never silently interpret an incomplete format-2 manifest as legacy.
+format=1
+if [[ -e $snapshot/format.txt || -L $snapshot/format.txt ]]; then
+  [[ -f $snapshot/format.txt && ! -L $snapshot/format.txt ]] || fail 'unsafe snapshot format marker'
+  [[ $(cat -- "$snapshot/format.txt") == 2 ]] || fail 'unsupported snapshot format'
+  format=2
+fi
+
 # Only the four fixed installed paths are ever eligible for recovery. Never
 # trust a manifest to supply arbitrary paths to a future restore operation.
 paths=(
   /usr/local/sbin/disk-watch.sh
+  /usr/local/sbin/disk-watch-health.sh
   /usr/local/sbin/disk-watch-smart.sh
   /etc/systemd/system/disk-watch.service
   /etc/systemd/system/disk-watch.timer
@@ -42,6 +52,11 @@ present_count=0
 for path in "${paths[@]}"; do
   in_present=$(grep -Fxc -- "$path" "$snapshot/present.txt" || true)
   in_absent=$(grep -Fxc -- "$path" "$snapshot/absent.txt" || true)
+  if [[ $format == 1 && $path == /usr/local/sbin/disk-watch-health.sh ]]; then
+    ((in_present + in_absent == 0)) || fail 'legacy snapshot must not claim the health helper'
+    [[ ! -e $snapshot$path && ! -L $snapshot$path ]] || fail 'unmanifested health helper in legacy snapshot'
+    continue
+  fi
   ((in_present + in_absent == 1)) || fail "duplicate or missing manifest entry for $path"
 
   # Do not follow a symlink in any component of a copied path.
@@ -77,12 +92,15 @@ find "$snapshot" -mindepth 1 ! -type d -exec bash -c '
   for entry in "$@"; do
     rel=${entry#"$root"/}
     case $rel in
-      .complete|present.txt|absent.txt|SHA256SUMS|\
-      usr/local/sbin/disk-watch.sh|usr/local/sbin/disk-watch-smart.sh|\
+      .complete|present.txt|absent.txt|SHA256SUMS|format.txt|\
+      usr/local/sbin/disk-watch.sh|usr/local/sbin/disk-watch-health.sh|usr/local/sbin/disk-watch-smart.sh|\
       etc/systemd/system/disk-watch.service|etc/systemd/system/disk-watch.timer) ;;
       *) printf "Snapshot verification failed: unlisted snapshot entry: %s\n" "$rel" >&2; exit 1 ;;
     esac
   done
 ' _ "$snapshot" {} + || fail 'unlisted or unreadable snapshot content'
 
-echo "Snapshot verified (read-only): $present_count present, $((4 - present_count)) absent. No files restored."
+if [[ $format == 1 ]]; then
+  echo 'Legacy four-path snapshot: disk-watch-health.sh was NOT captured; recover it separately.' >&2
+fi
+echo "Snapshot verified (read-only, format $format): $present_count present, $(((format == 1 ? 4 : 5) - present_count)) absent. No files restored."
