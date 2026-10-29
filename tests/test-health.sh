@@ -85,6 +85,28 @@ Serial Number:                  N/A
 SMART Health Status:            OK
 TEXT
  ;;
+zero_serial_wwn)
+ cat <<'TEXT'
+Device Model:                   Drive with zero-only serial and valid WWN
+Serial Number:                  0000000000000000
+LU WWN Device Id:               5 000cca 777777777
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
+oem_serial_no_wwn)
+ cat <<'TEXT'
+Product:                        USB bridge with OEM filler serial
+Serial number:                  To Be Filled By O.E.M.
+SMART Health Status:            OK
+TEXT
+ ;;
+numeric_serial)
+ cat <<'TEXT'
+Device Model:                   Drive with real numeric serial
+Serial Number:                  000000001234
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 zero_wwn)
  cat <<'TEXT'
 Device Model:                   Drive with all-zero WWN
@@ -186,7 +208,18 @@ awk -F '\t' '$2=="/dev/stdout" {if ($3!="/dev/stdout") exit 1; found=1} END {if 
 export SMART_SCENARIO=zero_wwn
 bash "$script" health --device /dev/stderr --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="Drive with all-zero WWN" {if ($3!="/dev/stderr") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'all-zero WWN should not become shared identity'
-[[ $(wc -l < "$TMP/calls") -eq 11 ]] || fail 'unexpected placeholder identity probe count'
+# Zero-only and OEM factory filler serials must not collide across drives.
+# A genuine numeric serial with nonzero digits remains a valid identifier.
+export SMART_SCENARIO=zero_serial_wwn
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with zero-only serial and valid WWN" {if ($3!="wwn:5000cca777777777") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'zero-only serial should defer to WWN'
+export SMART_SCENARIO=oem_serial_no_wwn
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="unavailable" && $2=="/dev/full" {if ($3!="/dev/full") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'OEM filler serial should fall back to device path'
+export SMART_SCENARIO=numeric_serial
+bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with real numeric serial" {if ($3!="000000001234") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'real numeric serial must retain precedence'
+[[ $(wc -l < "$TMP/calls") -eq 14 ]] || fail 'unexpected placeholder identity probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
