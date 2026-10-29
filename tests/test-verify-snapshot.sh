@@ -28,7 +28,9 @@ make_snapshot() {
   printf 'complete\n' > "$dir/.complete"
 }
 make_snapshot valid
-verify "$TMP/backups/valid" > "$TMP/out" || fail 'valid snapshot rejected'
+verify "$TMP/backups/valid" > "$TMP/out" 2> "$TMP/err" || fail 'valid snapshot rejected'
+grep -Fq 'health.sh was NOT captured' "$TMP/err" ||
+  fail 'legacy snapshot did not warn about missing health helper'
 grep -Fq '2 present, 2 absent' "$TMP/out" || fail 'wrong summary'
 
 # Format 2 includes the health helper, which the installer deploys. A missing
