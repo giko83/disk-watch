@@ -193,7 +193,7 @@ done
 # Existing bytes must remain intact: never silently mix history schemas.
 bad_header_state="$TMP/health-invalid-header"
 mkdir -p "$bad_header_state/health"
-printf 'timestamp_utc\\tdevice\\tlegacy_id\\n' > "$bad_header_state/health/snapshots.tsv"
+printf 'timestamp_utc\tdevice\tlegacy_id\n' > "$bad_header_state/health/snapshots.tsv"
 cp "$bad_header_state/health/snapshots.tsv" "$TMP/bad-header-original"
 probes_before=$(wc -l < "$TMP/calls")
 if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$bad_header_state" > "$TMP/out" 2>&1; then
