@@ -132,7 +132,7 @@ TEXT
 all_f_wwn_spaced)
  cat <<'TEXT'
 Device Model:                   Drive with spaced all-F WWN
-LU WWN Device Id:               F FFFFFF FFFFFFFFF
+LU WWN Device Id:               f Ffffff FfFfFfFfF
 SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
