@@ -53,7 +53,7 @@ cleanup_failed_rehearsal() {
 trap cleanup_failed_rehearsal EXIT
 
 count=0
-for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-smart.sh \
+for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-health.sh /usr/local/sbin/disk-watch-smart.sh \
             /etc/systemd/system/disk-watch.service /etc/systemd/system/disk-watch.timer; do
   if grep -Fxq -- "$path" "$snapshot/present.txt"; then
     mkdir -p -- "$(dirname -- "$sandbox$path")" ||

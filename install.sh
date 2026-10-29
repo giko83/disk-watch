@@ -94,6 +94,7 @@ install -d -m 700 -- "$BACKUP_ROOT"
 backup_dir=$(mktemp -d "$BACKUP_ROOT/backup.$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
 if ! bash ./scripts/backup-installed.sh "$backup_dir" \
   /usr/local/sbin/disk-watch.sh \
+  /usr/local/sbin/disk-watch-health.sh \
   /usr/local/sbin/disk-watch-smart.sh \
   /etc/systemd/system/disk-watch.service \
   /etc/systemd/system/disk-watch.timer; then

@@ -13,6 +13,7 @@ reject() {
 
 mkdir -p "$TMP/backups"
 script=/usr/local/sbin/disk-watch.sh
+health=/usr/local/sbin/disk-watch-health.sh
 unit=/etc/systemd/system/disk-watch.service
 missing=/etc/systemd/system/disk-watch.timer
 make_snapshot() {
@@ -27,8 +28,29 @@ make_snapshot() {
   printf 'complete\n' > "$dir/.complete"
 }
 make_snapshot valid
-verify "$TMP/backups/valid" > "$TMP/out" || fail 'valid snapshot rejected'
+verify "$TMP/backups/valid" > "$TMP/out" 2> "$TMP/err" || fail 'valid snapshot rejected'
+grep -Fq 'health.sh was NOT captured' "$TMP/err" ||
+  fail 'legacy snapshot did not warn about missing health helper'
 grep -Fq '2 present, 2 absent' "$TMP/out" || fail 'wrong summary'
+
+# Format 2 includes the health helper, which the installer deploys. A missing
+# health manifest entry must be rejected rather than treated as a legacy backup.
+cp -a -- "$TMP/backups/valid" "$TMP/backups/five-path"
+printf '2\n' > "$TMP/backups/five-path/format.txt"
+printf 'previous health helper\n' > "$TMP/backups/five-path$health"
+printf '%s\n' "$health" >> "$TMP/backups/five-path/present.txt"
+(cd "$TMP/backups/five-path" && sha256sum ".$health" >> SHA256SUMS)
+verify "$TMP/backups/five-path" > "$TMP/out" || fail 'five-path snapshot rejected'
+grep -Fq '3 present, 2 absent' "$TMP/out" || fail 'wrong five-path summary'
+
+cp -a -- "$TMP/backups/five-path" "$TMP/backups/five-path-missing"
+sed -i "\\|^$health$|d" "$TMP/backups/five-path-missing/present.txt"
+reject "$TMP/backups/five-path-missing" 'format 2 missing health manifest entry'
+
+cp -a -- "$TMP/backups/valid" "$TMP/backups/legacy-unlisted-health"
+printf 'unmanifested\n' > "$TMP/backups/legacy-unlisted-health$health"
+reject "$TMP/backups/legacy-unlisted-health" 'legacy snapshot with unmanifested health helper'
+
 
 make_snapshot tampered
 printf 'bad\n' > "$TMP/backups/tampered$script"
@@ -113,12 +135,19 @@ grep -Fxq "RESTORE: $script (saved file mode $(stat -c %a "$TMP/backups/valid$sc
   fail 'restore plan did not list previous monitor'
 grep -Fxq "RESTORE: $unit (saved file mode $(stat -c %a "$TMP/backups/valid$unit"))" "$TMP/out" ||
   fail 'restore plan did not list previous unit'
+grep -Fxq "NOT CAPTURED (legacy snapshot): $health (recover separately)" "$TMP/out" ||
+  fail 'legacy recovery plan did not flag missing health helper'
 grep -Fxq "REVIEW ABSENT: $missing (do not delete automatically)" "$TMP/out" ||
   fail 'restore plan did not flag absent timer for human review'
 grep -Fq 'No files, services, configuration, or state were changed.' "$TMP/out" ||
   fail 'restore plan lacks no-write warning'
 [[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before" ]] ||
   fail 'recovery plan modified snapshot contents'
+
+plan "$TMP/backups/five-path" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'five-path recovery plan rejected'
+grep -Fxq "RESTORE: $health (saved file mode $(stat -c %a "$TMP/backups/five-path$health"))" "$TMP/out" ||
+  fail 'five-path plan did not include health helper'
 
 # Quoted paths and empty snapshots must be supported without any deletion.
 cp -a -- "$TMP/backups/valid" "$TMP/backups/valid with spaces"
@@ -153,6 +182,11 @@ cmp -s "$TMP/backups/valid$unit" "$TMP/rehearsal$unit" ||
   fail 'rehearsal did not preserve file mode'
 [[ ! -e "$TMP/rehearsal$missing" ]] ||
   fail 'rehearsal unexpectedly created an absent file'
+mkdir -m 700 "$TMP/rehearsal-five"
+rehearse "$TMP/backups/five-path" "$TMP/rehearsal-five" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'five-path sandbox rehearsal rejected'
+cmp -s "$TMP/backups/five-path$health" "$TMP/rehearsal-five$health" ||
+  fail 'health helper not restored in sandbox'
 grep -Fq 'No live paths or services changed.' "$TMP/out" ||
   fail 'rehearsal missing live-host safety diagnostic'
 

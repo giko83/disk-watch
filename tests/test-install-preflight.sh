@@ -4,6 +4,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# Guard against omitting a deployed executable from the pre-install snapshot.
+grep -Fq '/usr/local/sbin/disk-watch-health.sh \' "$ROOT/install.sh" ||
+  { echo 'FAIL: installer backup omits disk-watch-health.sh' >&2; exit 1; }
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
