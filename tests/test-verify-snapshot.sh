@@ -34,9 +34,9 @@ grep -Fq '2 present, 2 absent' "$TMP/out" || fail 'wrong summary'
 # Format 2 includes the health helper, which the installer deploys. A missing
 # health manifest entry must be rejected rather than treated as a legacy backup.
 cp -a -- "$TMP/backups/valid" "$TMP/backups/five-path"
-printf '2\\n' > "$TMP/backups/five-path/format.txt"
-printf 'previous health helper\\n' > "$TMP/backups/five-path$health"
-printf '%s\\n' "$health" >> "$TMP/backups/five-path/present.txt"
+printf '2\n' > "$TMP/backups/five-path/format.txt"
+printf 'previous health helper\n' > "$TMP/backups/five-path$health"
+printf '%s\n' "$health" >> "$TMP/backups/five-path/present.txt"
 (cd "$TMP/backups/five-path" && sha256sum ".$health" >> SHA256SUMS)
 verify "$TMP/backups/five-path" > "$TMP/out" || fail 'five-path snapshot rejected'
 grep -Fq '3 present, 2 absent' "$TMP/out" || fail 'wrong five-path summary'
@@ -46,7 +46,7 @@ sed -i "\\|^$health$|d" "$TMP/backups/five-path-missing/present.txt"
 reject "$TMP/backups/five-path-missing" 'format 2 missing health manifest entry'
 
 cp -a -- "$TMP/backups/valid" "$TMP/backups/legacy-unlisted-health"
-printf 'unmanifested\\n' > "$TMP/backups/legacy-unlisted-health$health"
+printf 'unmanifested\n' > "$TMP/backups/legacy-unlisted-health$health"
 reject "$TMP/backups/legacy-unlisted-health" 'legacy snapshot with unmanifested health helper'
 
 
