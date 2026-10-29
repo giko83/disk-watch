@@ -94,8 +94,14 @@ if ((refresh)); then
   # SCSI/USB bridges may use "Serial number:" rather than "Serial Number:".
   # Preserve a firmware serial as the cached ID instead of the volatile /dev path.
   serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit}' <<<"$raw")
+  # Some ATA/SCSI reports expose a WWN but no serial. Accept only a full
+  # 16-hex-digit device identifier; never synthesize one from a /dev path.
+  # Keep serial precedence to preserve existing snapshot IDs.
+  wwn=$(awk -F: 'tolower($1) ~ /^[[:space:]]*(lu[[:space:]]+)?wwn[[:space:]]+device[[:space:]]+id[[:space:]]*$/ {gsub(/[[:space:]]/, "", $2); if (length($2)==16 && $2 ~ /^[[:xdigit:]]+$/) {print tolower($2); exit}}' <<<"$raw")
   id=$device
-  [[ -z $serial ]] || id=$serial
+  if [[ -n $serial ]]; then id=$serial
+  elif [[ -n $wwn ]]; then id="wwn:$wwn"
+  fi
   health=unavailable
   if grep -Eq 'SMART overall-health self-assessment test result:[[:space:]]*PASSED|SMART Health Status:[[:space:]]*OK' <<<"$raw"; then health=passed
   elif grep -Eiq 'SMART overall-health self-assessment test result:[[:space:]]*FAILED|SMART Health Status:[[:space:]]*(FAILED|BAD)' <<<"$raw"; then health=failed

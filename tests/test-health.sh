@@ -39,6 +39,7 @@ scsi_usb)
 Vendor:                         Example
 Product:                        USB/SCSI bridge
 Serial number:                  USB-SCSI-0003   
+LU WWN Device Id:               5 000cca 999999999
 SMART Health Status:            OK
 TEXT
  ;;
@@ -46,6 +47,27 @@ scsi_no_serial)
  cat <<'TEXT'
 Product:                        USB bridge without exposed serial
 SMART Health Status:            OK
+TEXT
+ ;;
+ata_wwn)
+ cat <<'TEXT'
+Device Model:                   ATA drive without serial
+LU WWN Device Id:               5 000cca 123456789
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
+wwn_compact)
+ cat <<'TEXT'
+Device Model:                   Same drive, changed /dev path
+WWN Device Id:                  5000CCA123456789
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
+wwn_invalid)
+ cat <<'TEXT'
+Device Model:                   Drive with malformed WWN
+LU WWN Device Id:               5 000cca 12345678g
+SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
 fail)
@@ -117,6 +139,20 @@ export SMART_SCENARIO=scsi_no_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$2=="/dev/random" {if ($3!="/dev/random" || $4!="unavailable" || $5!="passed" || $6!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'missing serial should fall back to device path'
 [[ $(wc -l < "$TMP/calls") -eq 5 ]] || fail 'unexpected USB mock probe count'
+# A validated WWN supplies a stable cache ID when the firmware serial is absent.
+# Two /dev paths and WWN label formats must map to the same history identity.
+export SMART_SCENARIO=ata_wwn
+bash "$script" health --device /dev/urandom --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$2=="/dev/urandom" {if ($3!="wwn:5000cca123456789" || $5!="passed") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'spaced LU WWN identity parsing failed'
+export SMART_SCENARIO=wwn_compact
+bash "$script" health --device /dev/tty --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+bash "$script" history --device wwn:5000cca123456789 --state-dir "$st" --format tsv > "$TMP/out"
+[[ $(wc -l < "$TMP/out") -eq 3 ]] || fail 'same WWN on different paths should share history'
+# Malformed WWNs must not become a guessed persistent identifier.
+export SMART_SCENARIO=wwn_invalid
+bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with malformed WWN" {if ($2!="/dev/null" || $3!="/dev/null") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'malformed WWN should fall back to device path'
+[[ $(wc -l < "$TMP/calls") -eq 8 ]] || fail 'unexpected WWN mock probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
@@ -153,4 +189,4 @@ for bad_state in "$TMP/ancestor-link/nested" "$TMP/ancestor-file/nested"; do
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe ancestor triggered SMART probe'
 [[ ! -e "$TMP/ancestor-target/nested/health/snapshots.tsv" ]] || fail 'symlink ancestor received snapshot'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and synthetic SCSI/USB serial parsing, history, filters, and unsafe storage rejection'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, and unsafe storage rejection'

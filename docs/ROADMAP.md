@@ -4,7 +4,7 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-29.
 
-**Partial #23 identification increment:** cached opt-in SMART refresh recognizes both `Serial Number:` and SCSI/USB-style `Serial number:` text labels (trimming whitespace), with offline mock tests. It still falls back to the device path when no serial is available. This is not WWN/by-id discovery, USB/SAT capability probing, or a never-wake policy; #23 remains open. See [health guide](health.md).
+**Partial #23 identification increment:** cached opt-in SMART refresh recognizes both `Serial Number:` and SCSI/USB-style `Serial number:` text labels (trimming whitespace). When no serial exists, a validated 16-hex-digit WWN from the same report now supplies a `wwn:<hex>` cache ID; otherwise it falls back to the device path. Offline mocks cover spaced/compact WWNs, path changes, malformed values and serial precedence. This is not /dev/disk/by-id discovery, USB/SAT capability probing, or a never-wake policy; #23 remains open. See [health guide](health.md).
 
 **Partial #21 safety increment:** explicit SMART snapshot refresh now rejects directly symlinked state/health directories and symlinked or non-regular snapshot/lock targets before disk access, with offline regressions. This now also rejects symlinked or non-directory ancestors of the state directory before SMART access, with offline regressions. It is not stable-ID history, retention or race-proof filesystem isolation; #21 remains open.
 
