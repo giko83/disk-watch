@@ -85,7 +85,17 @@ if ((refresh)); then
     [[ ! -L $db && ( ! -e $db || -f $db ) ]] &&
     [[ ! -L $snapshot_lock && ( ! -e $snapshot_lock || -f $snapshot_lock ) ]]
   }
+  # An existing nonempty history must use the exact current schema. Check
+  # before SMART access so an incompatible file never causes a disk wake-up.
+  # A header without a terminating newline is incomplete and unsafe to append.
+  snapshot_header_safe() {
+    [[ -s $db ]] || return 0
+    local existing_header
+    IFS= read -r existing_header < "$db" || return 1
+    [[ $existing_header == "$header" ]]
+  }
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
   echo "SMART read from $device may wake disk" >&2
   raw=$(smartctl -a -- "$device" 2>&1) || :
@@ -130,6 +140,7 @@ if ((refresh)); then
   exec 9>>"$snapshot_lock"
   flock -x 9
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
   [[ -s $db ]] || printf '%s\n' "$header" > "$db"
   (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
   chmod 600 "$db"

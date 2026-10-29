@@ -29,6 +29,18 @@ Replace `/dev/nvme0` with the exact device you have identified. Prefer a persist
 
 `--refresh` and `--wake-ok` are both required. Do **not** run against USB backup disks deliberately configured to remain asleep (such as a Restic backup disk) unless you intentionally accept a spin-up. **Default reports never query hardware**, even if a `--device` filter is present.
 
+## Existing history format guard
+
+An explicit `health --refresh --wake-ok` refuses to append if the existing nonempty `health/snapshots.tsv` has a different header from the current 13-column schema, or if that header lacks its terminating newline. The check happens **before smartctl**, so a rejected append does not wake the disk; it is repeated under the snapshot lock. The existing file is left unchanged, and cached read commands are unaffected. This is a best-effort format check, not a migration tool, a validation of every historical row, or protection against concurrent hostile filesystem changes.
+
+To diagnose the mismatch without changing the file, inspect the first line, for example:
+
+```sh
+sudo head -n 1 /var/lib/disk-watch/health/snapshots.tsv
+```
+
+Preserve the original history and investigate the schema before attempting any manual conversion. This uses existing Bash and coreutils; no new runtime service or hardware probe is required for the guard. Older/custom headers are not silently rewritten.
+
 ## Snapshot fields
 
 `timestamp_utc`, `device`, `id` (SMART serial if available, otherwise validated WWN prefixed `wwn:`, otherwise device path), `model`, `health` (firmware SMART overall result), `temperature_c`, `power_on_hours`, `reallocated`, `pending`, `media_errors`, `gb_written`, `wear_percent`, `last_test`.
