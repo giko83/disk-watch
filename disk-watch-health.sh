@@ -112,11 +112,12 @@ if ((refresh)); then
   model=$(awk -F: '/^(Device Model|Model Number):/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
   # SCSI/USB bridges may use "Serial number:" rather than "Serial Number:".
   # Preserve a firmware serial as the cached ID instead of the volatile /dev path.
-  serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit}' <<<"$raw")
+  # Generic placeholder serials are not unique; use WWN or the device path instead.
+  serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); s=tolower($2); if (s=="unknown" || s=="unavailable" || s=="none" || s=="n/a" || s=="not available") exit; print $2; exit}' <<<"$raw")
   # Some ATA/SCSI reports expose a WWN but no serial. Accept only a full
-  # 16-hex-digit device identifier; never synthesize one from a /dev path.
+  # 16-hex-digit nonzero device identifier; never synthesize one from a /dev path.
   # Keep serial precedence to preserve existing snapshot IDs.
-  wwn=$(awk -F: 'tolower($1) ~ /^[[:space:]]*(lu[[:space:]]+)?wwn[[:space:]]+device[[:space:]]+id[[:space:]]*$/ {gsub(/[[:space:]]/, "", $2); if (length($2)==16 && $2 ~ /^[[:xdigit:]]+$/) {print tolower($2); exit}}' <<<"$raw")
+  wwn=$(awk -F: 'tolower($1) ~ /^[[:space:]]*(lu[[:space:]]+)?wwn[[:space:]]+device[[:space:]]+id[[:space:]]*$/ {gsub(/[[:space:]]/, "", $2); if (length($2)==16 && $2 ~ /^[[:xdigit:]]+$/ && $2 !~ /^0+$/) {print tolower($2); exit}}' <<<"$raw")
   id=$device
   if [[ -n $serial ]]; then id=$serial
   elif [[ -n $wwn ]]; then id="wwn:$wwn"
