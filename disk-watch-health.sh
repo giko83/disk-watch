@@ -61,6 +61,16 @@ if ((refresh)); then
   [[ $device == /dev/* && $device != *$'\n'* && $device != *$'\t'* ]] || {
     echo 'Explicit /dev/... path required' >&2; exit 2;
   }
+  # Refuse unsafe cache paths before touching a disk. A symlinked lock file
+  # would otherwise be opened with shell redirection as root. This is a
+  # best-effort guard; state directories must remain under trusted parents.
+  snapshot_lock="$state/health/.snapshots.lock"
+  snapshot_targets_safe() {
+    [[ ! -L $state && ! -L "$state/health" ]] &&
+    [[ ! -L $db && ( ! -e $db || -f $db ) ]] &&
+    [[ ! -L $snapshot_lock && ( ! -e $snapshot_lock || -f $snapshot_lock ) ]]
+  }
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
   echo "SMART read from $device may wake disk" >&2
   raw=$(smartctl -a -- "$device" 2>&1) || :
@@ -92,9 +102,11 @@ if ((refresh)); then
   for i in "${!fields[@]}"; do fields[$i]=$(clean "${fields[$i]}"); done
   umask 077
   mkdir -p -- "$state/health"
-  [[ ! -L $db && ( ! -e $db || -f $db ) ]] || { echo 'Unsafe snapshot target' >&2; exit 1; }
-  exec 9>"$state/health/.snapshots.lock"
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  # Append-only open avoids truncating a pre-existing regular lock file.
+  exec 9>>"$snapshot_lock"
   flock -x 9
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
   [[ -s $db ]] || printf '%s\n' "$header" > "$db"
   (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
   chmod 600 "$db"
