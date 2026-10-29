@@ -74,6 +74,10 @@ for src in "$@"; do
   fi
 done
 
+# Format 2 snapshots include the installed SMART health helper as a fifth
+# recovery path. A format marker prevents a truncated new manifest from being
+# mistaken for an older four-path snapshot.
+printf '2\n' > "$backup_dir/format.txt"
 : > "$backup_dir/present.txt"
 : > "$backup_dir/absent.txt"
 for src in "$@"; do
