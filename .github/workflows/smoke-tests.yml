@@ -57,7 +57,7 @@ jobs:
           docker run --rm --network none --read-only \
             --user "$(id -u):$(id -g)" \
             --cap-drop ALL --security-opt no-new-privileges \
-            --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777 \
             --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
             --workdir /src --env HOME=/tmp \
             "debian:${{ matrix.debian }}" \
