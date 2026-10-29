@@ -70,6 +70,28 @@ LU WWN Device Id:               5 000cca 12345678g
 SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
+placeholder_serial_wwn)
+ cat <<'TEXT'
+Device Model:                   USB bridge with placeholder serial
+Serial number:                  UNKNOWN
+LU WWN Device Id:               5 000cca 555555555
+SMART Health Status:            OK
+TEXT
+ ;;
+placeholder_serial_no_wwn)
+ cat <<'TEXT'
+Product:                        USB bridge without stable ID
+Serial Number:                  N/A
+SMART Health Status:            OK
+TEXT
+ ;;
+zero_wwn)
+ cat <<'TEXT'
+Device Model:                   Drive with all-zero WWN
+WWN Device Id:                  0000000000000000
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 fail)
  echo 'smartctl: device not found' >&2
  exit 2 ;;
@@ -153,6 +175,18 @@ export SMART_SCENARIO=wwn_invalid
 bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="Drive with malformed WWN" {if ($2!="/dev/null" || $3!="/dev/null") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'malformed WWN should fall back to device path'
 [[ $(wc -l < "$TMP/calls") -eq 8 ]] || fail 'unexpected WWN mock probe count'
+# Placeholder serials are not unique identities: use a valid WWN if present,
+# otherwise keep the explicit path. An all-zero WWN must not merge histories.
+export SMART_SCENARIO=placeholder_serial_wwn
+bash "$script" health --device /dev/stdin --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="USB bridge with placeholder serial" {if ($3!="wwn:5000cca555555555") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'placeholder serial should defer to valid WWN'
+export SMART_SCENARIO=placeholder_serial_no_wwn
+bash "$script" health --device /dev/stdout --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$2=="/dev/stdout" {if ($3!="/dev/stdout") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'placeholder serial without WWN should use path'
+export SMART_SCENARIO=zero_wwn
+bash "$script" health --device /dev/stderr --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with all-zero WWN" {if ($3!="/dev/stderr") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'all-zero WWN should not become shared identity'
+[[ $(wc -l < "$TMP/calls") -eq 11 ]] || fail 'unexpected placeholder identity probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
@@ -233,4 +267,4 @@ for scenario in short extra blank-id unterminated; do
   cmp -s "$TMP/bad-row-original" "$bad_row_state/health/snapshots.tsv" || fail "malformed $scenario history was modified"
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'malformed snapshot rows triggered SMART probe'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, unsafe storage and snapshot header/row rejection'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including placeholders, history, filters, unsafe storage and snapshot header/row rejection'
