@@ -34,6 +34,20 @@ ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_
 197 Current_Pending_Sector  0x0012   100   100   000    Old_age   Always       -       3
 TEXT
  ;;
+scsi_usb)
+ cat <<'TEXT'
+Vendor:                         Example
+Product:                        USB/SCSI bridge
+Serial number:                  USB-SCSI-0003   
+SMART Health Status:            OK
+TEXT
+ ;;
+scsi_no_serial)
+ cat <<'TEXT'
+Product:                        USB bridge without exposed serial
+SMART Health Status:            OK
+TEXT
+ ;;
 fail)
  echo 'smartctl: device not found' >&2
  exit 2 ;;
@@ -91,6 +105,18 @@ export SMART_SCENARIO=fail
 if bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" > "$TMP/out" 2>&1; then fail 'unreadable SMART report was accepted'; fi
 [[ $(wc -l < "$st/health/snapshots.tsv") -eq 3 ]] || fail 'failed SMART probe wrote snapshot'
 [[ $(wc -l < "$TMP/calls") -eq 3 ]] || fail 'unexpected probe count'
+# Synthetic SCSI/USB text uses a lowercase "number" label. Its firmware serial
+# must be the cache ID, not the transient /dev path; missing metrics stay absent.
+export SMART_SCENARIO=scsi_usb
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="USB-SCSI-0003" {if ($2!="/dev/full" || $4!="unavailable" || $5!="passed" || $6!="unavailable" || $11!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'SCSI/USB serial or unavailable metric parsing wrong'
+bash "$script" history --device USB-SCSI-0003 --state-dir "$st" --format tsv > "$TMP/out"
+[[ $(wc -l < "$TMP/out") -eq 2 ]] || fail 'SCSI/USB serial history filter failed'
+# A bridge without a serial must still use the explicit path, never invent an ID.
+export SMART_SCENARIO=scsi_no_serial
+bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$2=="/dev/random" {if ($3!="/dev/random" || $4!="unavailable" || $5!="passed" || $6!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'missing serial should fall back to device path'
+[[ $(wc -l < "$TMP/calls") -eq 5 ]] || fail 'unexpected USB mock probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
@@ -127,4 +153,4 @@ for bad_state in "$TMP/ancestor-link/nested" "$TMP/ancestor-file/nested"; do
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe ancestor triggered SMART probe'
 [[ ! -e "$TMP/ancestor-target/nested/health/snapshots.tsv" ]] || fail 'symlink ancestor received snapshot'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA metrics, history, filters, and unsafe storage rejection'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and synthetic SCSI/USB serial parsing, history, filters, and unsafe storage rejection'
