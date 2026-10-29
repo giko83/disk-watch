@@ -91,7 +91,9 @@ if ((refresh)); then
   raw=$(smartctl -a -- "$device" 2>&1) || :
   grep -Eq '^(Model Number|Device Model|SMART overall-health self-assessment test result|SMART Health Status|SMART/Health Information)' <<<"$raw" || { echo 'No readable SMART report; snapshot not saved' >&2; exit 1; }
   model=$(awk -F: '/^(Device Model|Model Number):/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
-  serial=$(awk -F: '/^Serial Number:/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
+  # SCSI/USB bridges may use "Serial number:" rather than "Serial Number:".
+  # Preserve a firmware serial as the cached ID instead of the volatile /dev path.
+  serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit}' <<<"$raw")
   id=$device
   [[ -z $serial ]] || id=$serial
   health=unavailable
