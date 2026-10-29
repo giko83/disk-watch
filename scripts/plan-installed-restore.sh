@@ -16,12 +16,17 @@ bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2
 
 paths=(
   /usr/local/sbin/disk-watch.sh
+  /usr/local/sbin/disk-watch-health.sh
   /usr/local/sbin/disk-watch-smart.sh
   /etc/systemd/system/disk-watch.service
   /etc/systemd/system/disk-watch.timer
 )
 printf 'Read-only recovery plan for verified snapshot: %s\n' "$snapshot"
 for path in "${paths[@]}"; do
+  if [[ $path == /usr/local/sbin/disk-watch-health.sh && ! -f $snapshot/format.txt ]]; then
+    printf 'NOT CAPTURED (legacy snapshot): %s (recover separately)\n' "$path"
+    continue
+  fi
   if grep -Fxq -- "$path" "$snapshot/present.txt"; then
     mode=$(stat -c '%a' -- "$snapshot$path")
     printf 'RESTORE: %s (saved file mode %s)\n' "$path" "$mode"
