@@ -53,7 +53,7 @@ sudo /usr/local/sbin/disk-watch.sh health --device /dev/nvme0 --refresh --wake-o
 sudo /usr/local/sbin/disk-watch.sh history --device SERIAL --format tsv
 ```
 
-Data is saved in `/var/lib/disk-watch/health/snapshots.tsv` only after a deliberate refresh, not as part of the one-minute monitoring timer. **Never use --refresh on intentionally sleeping USB backup drives unless you want to wake them.** The initial cache may be empty and report `unavailable`. See [the health command guide](docs/health.md) for limitations, NVMe write estimates, permissions and the machine-readable TSV format.
+Data is saved in `/var/lib/disk-watch/health/snapshots.tsv` only after a deliberate refresh, not as part of the one-minute monitoring timer. **Never use --refresh on intentionally sleeping USB backup drives unless you want to wake them.** The initial cache may be empty and report `unavailable`. Live refresh refuses directly symlinked state/health directories, snapshot or lock files, and non-regular targets before probing a disk; use trusted state paths (this is not race-proof). See [the health command guide](docs/health.md) for limitations, NVMe write estimates, permissions and the machine-readable TSV format.
 
 ## Existing or new installation
 
