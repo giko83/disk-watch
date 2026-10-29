@@ -91,4 +91,26 @@ export SMART_SCENARIO=fail
 if bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" > "$TMP/out" 2>&1; then fail 'unreadable SMART report was accepted'; fi
 [[ $(wc -l < "$st/health/snapshots.tsv") -eq 3 ]] || fail 'failed SMART probe wrote snapshot'
 [[ $(wc -l < "$TMP/calls") -eq 3 ]] || fail 'unexpected probe count'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA metrics, history, device filters, report and failures'
+# Reject unsafe snapshot paths before the SMART probe, not just before write.
+# A symlinked lock must not truncate its target; a FIFO must not hang refresh.
+mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
+  "$TMP/health-fifo-lock/health" "$TMP/health-linked-db/health"
+ln -s "$TMP/redirected" "$TMP/health-linked-state"
+ln -s "$TMP/redirected" "$TMP/health-linked-dir/health"
+printf 'DO NOT TOUCH\n' > "$TMP/sentinel"
+ln -s "$TMP/sentinel" "$TMP/health-linked-lock/health/.snapshots.lock"
+ln -s "$TMP/sentinel" "$TMP/health-linked-db/health/snapshots.tsv"
+mkfifo "$TMP/health-fifo-lock/health/.snapshots.lock"
+probes_before=$(wc -l < "$TMP/calls")
+export SMART_SCENARIO=ata
+for bad in health-linked-state health-linked-dir health-linked-lock health-linked-db health-fifo-lock; do
+  if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$TMP/$bad" > "$TMP/out" 2>&1; then
+    fail "unsafe snapshot storage $bad was accepted"
+  fi
+  grep -Fq 'Unsafe SMART snapshot storage path' "$TMP/out" ||
+    fail "missing unsafe snapshot storage diagnostic for $bad"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe storage probed SMART hardware'
+[[ $(cat "$TMP/sentinel") == 'DO NOT TOUCH' ]] || fail 'symlink target was changed'
+[[ ! -e "$TMP/redirected/snapshots.tsv" ]] || fail 'symlinked directory received snapshot'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA metrics, history, filters, and unsafe storage rejection'
