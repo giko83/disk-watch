@@ -189,4 +189,25 @@ for bad_state in "$TMP/ancestor-link/nested" "$TMP/ancestor-file/nested"; do
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe ancestor triggered SMART probe'
 [[ ! -e "$TMP/ancestor-target/nested/health/snapshots.tsv" ]] || fail 'symlink ancestor received snapshot'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, and unsafe storage rejection'
+# Reject incompatible or unterminated snapshot headers before probing SMART.
+# Existing bytes must remain intact: never silently mix history schemas.
+bad_header_state="$TMP/health-invalid-header"
+mkdir -p "$bad_header_state/health"
+printf 'timestamp_utc\\tdevice\\tlegacy_id\\n' > "$bad_header_state/health/snapshots.tsv"
+cp "$bad_header_state/health/snapshots.tsv" "$TMP/bad-header-original"
+probes_before=$(wc -l < "$TMP/calls")
+if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$bad_header_state" > "$TMP/out" 2>&1; then
+  fail 'incompatible snapshot header was accepted'
+fi
+grep -Fq 'Incompatible SMART snapshot header' "$TMP/out" || fail 'missing incompatible header diagnostic'
+cmp -s "$TMP/bad-header-original" "$bad_header_state/health/snapshots.tsv" || fail 'incompatible history was modified'
+# A correct-looking header without its final newline is also unsafe to append.
+printf '%s' "$(head -n 1 "$st/health/snapshots.tsv")" > "$bad_header_state/health/snapshots.tsv"
+cp "$bad_header_state/health/snapshots.tsv" "$TMP/bad-header-original"
+if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$bad_header_state" > "$TMP/out" 2>&1; then
+  fail 'unterminated snapshot header was accepted'
+fi
+grep -Fq 'Incompatible SMART snapshot header' "$TMP/out" || fail 'missing unterminated header diagnostic'
+cmp -s "$TMP/bad-header-original" "$bad_header_state/health/snapshots.tsv" || fail 'unterminated history was modified'
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'invalid snapshot header triggered SMART probe'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, unsafe storage and snapshot header rejection'
