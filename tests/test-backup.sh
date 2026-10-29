@@ -118,7 +118,8 @@ exit 45
 MOCK
 chmod +x "$TMP/mock-bin/cp"
 mkdir -m 700 "$TMP/backups/backup.failed"
-if PATH="$TMP/mock-bin:$PATH" bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.failed" "$script" > "$TMP/out" 2> "$TMP/err"; then
+if PATH="$TMP/mock-bin:$PATH" bash -x "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.failed" "$script" > "$TMP/out" 2> "$TMP/err"; then
+  cat "$TMP/err" >&2
   fail 'failed copy accepted'
 fi
 [[ ! -e "$TMP/backups/backup.failed/.complete" ]] || fail 'failed copy marked complete'
