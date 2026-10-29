@@ -210,4 +210,27 @@ fi
 grep -Fq 'Incompatible SMART snapshot header' "$TMP/out" || fail 'missing unterminated header diagnostic'
 cmp -s "$TMP/bad-header-original" "$bad_header_state/health/snapshots.tsv" || fail 'unterminated history was modified'
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'invalid snapshot header triggered SMART probe'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, unsafe storage and snapshot header rejection'
+# Refuse damaged historical data rows as well as damaged headers. A truncated
+# final line could otherwise be joined to a new snapshot during append.
+bad_row_state="$TMP/health-invalid-rows"
+mkdir -p "$bad_row_state/health"
+valid_header=$(head -n 1 "$st/health/snapshots.tsv")
+valid_row=$(sed -n '2p' "$st/health/snapshots.tsv")
+probes_before=$(wc -l < "$TMP/calls")
+for scenario in short extra blank-id unterminated; do
+  printf '%s\n' "$valid_header" > "$bad_row_state/health/snapshots.tsv"
+  case $scenario in
+    short) printf '2026-10-29T12:00:00Z\t/dev/fake\n' >> "$bad_row_state/health/snapshots.tsv" ;;
+    extra) printf '%s\textra\n' "$valid_row" >> "$bad_row_state/health/snapshots.tsv" ;;
+    blank-id) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$3=""; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    unterminated) printf '%s' "$valid_row" >> "$bad_row_state/health/snapshots.tsv" ;;
+  esac
+  cp "$bad_row_state/health/snapshots.tsv" "$TMP/bad-row-original"
+  if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$bad_row_state" > "$TMP/out" 2>&1; then
+    fail "malformed snapshot $scenario row was accepted"
+  fi
+  grep -Fq 'Malformed SMART snapshot rows' "$TMP/out" || fail "missing malformed $scenario row diagnostic"
+  cmp -s "$TMP/bad-row-original" "$bad_row_state/health/snapshots.tsv" || fail "malformed $scenario history was modified"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'malformed snapshot rows triggered SMART probe'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity, history, filters, unsafe storage and snapshot header/row rejection'
