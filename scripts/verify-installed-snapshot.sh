@@ -29,7 +29,8 @@ if [[ -e $snapshot/format.txt || -L $snapshot/format.txt ]]; then
   format=2
 fi
 
-# Only the four fixed installed paths are ever eligible for recovery. Never
+# Only the fixed installed paths are ever eligible for recovery (five in
+# format 2, four in checksum-bearing legacy snapshots). Never
 # trust a manifest to supply arbitrary paths to a future restore operation.
 paths=(
   /usr/local/sbin/disk-watch.sh
