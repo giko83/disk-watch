@@ -26,12 +26,21 @@ cat > "$TMP/mock-bin/systemctl" <<'MOCK'
 printf 'called\n' >> "$MOCK_SYSTEMCTL_LOG"
 exit 70
 MOCK
-chmod +x "$TMP/mock-bin/systemctl"
+# Debian base containers intentionally omit journald. The preflight checks
+# command availability but must never invoke journalctl during offline tests.
+cat > "$TMP/mock-bin/journalctl" <<'MOCK'
+#!/usr/bin/env bash
+echo 'unexpected journalctl invocation in offline preflight' >&2
+exit 71
+MOCK
+chmod +x "$TMP/mock-bin/systemctl" "$TMP/mock-bin/journalctl"
 export MOCK_SYSTEMCTL_LOG="$TMP/systemctl.called"
 export PATH="$TMP/mock-bin:$PATH"
 
-bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err" ||
+if ! bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  cat "$TMP/err" >&2
   fail 'valid checkout failed preflight'
+fi
 grep -Fq 'Preflight OK' "$TMP/out" || fail 'missing success diagnostic'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight invoked systemctl'
 [[ ! -e "$TMP/source/kernel.cursor" ]] || fail 'preflight created a cursor'
