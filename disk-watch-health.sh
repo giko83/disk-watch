@@ -94,8 +94,17 @@ if ((refresh)); then
     IFS= read -r existing_header < "$db" || return 1
     [[ $existing_header == "$header" ]]
   }
+  # Existing rows must have the expected 13 fields and a final newline.
+  # Otherwise an append can silently join a truncated last row or mix schemas.
+  # This is a read-only check, repeated under the append lock.
+  snapshot_rows_safe() {
+    [[ -s $db ]] || return 0
+    [[ $(tail -c 1 -- "$db"; printf '.') == $'\n.' ]] || return 1
+    awk -F '\t' 'NR > 1 && (NF != 13 || $1 == "" || $2 == "" || $3 == "") {exit 1}' "$db"
+  }
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
+  snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
   echo "SMART read from $device may wake disk" >&2
   raw=$(smartctl -a -- "$device" 2>&1) || :
@@ -141,6 +150,7 @@ if ((refresh)); then
   flock -x 9
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
+  snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
   [[ -s $db ]] || printf '%s\n' "$header" > "$db"
   (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
   chmod 600 "$db"
