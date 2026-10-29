@@ -23,7 +23,14 @@ cat > "$TMP/mock-bin/git" <<'MOCK'
 printf 'git %s\n' "$*" >> "$MOCK_LOG"
 case "$*" in
   'status --porcelain')
-    if [[ ${MOCK_DIRTY:-0} == 1 ]]; then echo ' M update.sh'; fi
+    # The first status runs before pull; the second verifies the pulled tree.
+    if grep -Fxq 'git pull --ff-only' "$MOCK_LOG"; then
+      [[ ${MOCK_STATUS_FAIL:-} != after ]] || { echo 'mock post-pull status failure' >&2; exit 55; }
+      if [[ ${MOCK_DIRTY_AFTER_PULL:-0} == 1 ]]; then echo ' M install.sh'; fi
+    else
+      [[ ${MOCK_STATUS_FAIL:-} != before ]] || { echo 'mock initial status failure' >&2; exit 55; }
+      if [[ ${MOCK_DIRTY:-0} == 1 ]]; then echo ' M update.sh'; fi
+    fi
     ;;
   'rev-parse HEAD') echo 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ;;
   'pull --ff-only')
@@ -66,11 +73,32 @@ grep -Fq 'Checkout has local modifications' "$TMP/err" || fail 'dirty checkout d
 ! grep -Eq 'pull|install' "$MOCK_LOG" || fail 'dirty checkout triggered pull/install'
 
 : > "$MOCK_LOG"
+if MOCK_STATUS_FAIL=before bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'failed initial Git status accepted'
+fi
+grep -Fq 'Cannot inspect Git checkout; update aborted' "$TMP/err" || fail 'initial status error diagnostic missing'
+! grep -Eq 'pull|install' "$MOCK_LOG" || fail 'initial status error triggered pull/install'
+
+: > "$MOCK_LOG"
 if MOCK_PULL_FAIL=1 bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
   fail 'failed pull accepted'
 fi
 grep -Fxq 'git pull --ff-only' "$MOCK_LOG" || fail 'updater did not require fast-forward pull'
 ! grep -Fq 'install' "$MOCK_LOG" || fail 'failed pull triggered installer'
+
+: > "$MOCK_LOG"
+if MOCK_STATUS_FAIL=after bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'failed post-pull Git status accepted'
+fi
+grep -Fq 'Cannot inspect Git checkout after pull' "$TMP/err" || fail 'post-pull status error diagnostic missing'
+! grep -Fq 'install' "$MOCK_LOG" || fail 'post-pull status error triggered installer'
+
+: > "$MOCK_LOG"
+if MOCK_DIRTY_AFTER_PULL=1 bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'dirty checkout after pull accepted'
+fi
+grep -Fq 'Checkout has local modifications after pull' "$TMP/err" || fail 'post-pull dirty diagnostic missing'
+! grep -Fq 'install' "$MOCK_LOG" || fail 'post-pull dirty checkout triggered installer'
 
 : > "$MOCK_LOG"
 if MOCK_PREFLIGHT_FAIL=1 bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
@@ -94,6 +122,7 @@ cat > "$TMP/expected" <<'EXPECTED'
 git status --porcelain
 git rev-parse HEAD
 git pull --ff-only
+git status --porcelain
 install --preflight
 install
 git rev-parse --short HEAD
@@ -101,4 +130,4 @@ EXPECTED
 diff -u "$TMP/expected" "$MOCK_LOG" || fail 'update operations ran out of order'
 grep -Fq 'Disk Watch updated to bbbbbbb' "$TMP/out" || fail 'success diagnostic absent'
 
-echo 'PASS: offline updater checkout, dirty-tree, fast-forward, preflight, deployment failure and success flow'
+echo 'PASS: offline updater checkout, pre/post-pull status failures, post-pull dirty-tree, fast-forward, preflight, deployment failure and success flow'
