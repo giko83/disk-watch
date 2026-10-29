@@ -4,7 +4,7 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-29.
 
-**Partial #21 safety increment:** explicit SMART snapshot refresh now rejects directly symlinked state/health directories and symlinked or non-regular snapshot/lock targets before disk access, with offline regressions. This is not stable-ID history, retention or race-proof filesystem isolation; #21 remains open.
+**Partial #21 safety increment:** explicit SMART snapshot refresh now rejects directly symlinked state/health directories and symlinked or non-regular snapshot/lock targets before disk access, with offline regressions. This now also rejects symlinked or non-directory ancestors of the state directory before SMART access, with offline regressions. It is not stable-ID history, retention or race-proof filesystem isolation; #21 remains open.
 
 **Implemented (issue #27, [PR #63](https://github.com/giko83/disk-watch/pull/63)):** cached non-waking `status`, `disks`, `health`, `history`, and `report` commands with optional explicit SMART snapshots (`--refresh --wake-ok`) are merged into `main` with offline tests. They are **not automatically deployed** to the three homelab hosts. Persistent alert history and comprehensive timestamped SMART self-test collection remain outside this MVP; `SMART PASSED` is not a reliability guarantee. See [health guide](health.md).
 

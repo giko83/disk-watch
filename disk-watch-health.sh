@@ -65,7 +65,22 @@ if ((refresh)); then
   # would otherwise be opened with shell redirection as root. This is a
   # best-effort guard; state directories must remain under trusted parents.
   snapshot_lock="$state/health/.snapshots.lock"
+  # Walk every directory component, including ancestors of --state-dir.
+  # Checking only the final state/health paths misses e.g. /tmp/link/state
+  # where link is a symlink. These checks remain best-effort against races.
+  snapshot_directory_chain_safe() {
+    local rest="$state/health" part prefix
+    if [[ $rest == /* ]]; then prefix=/; rest=${rest#/}; else prefix=.; fi
+    while [[ -n $rest ]]; do
+      part=${rest%%/*}
+      if [[ $rest == */* ]]; then rest=${rest#*/}; else rest=''; fi
+      [[ -z $part || $part == . ]] && continue
+      prefix="${prefix%/}/$part"
+      [[ ! -L $prefix && ( ! -e $prefix || -d $prefix ) ]] || return 1
+    done
+  }
   snapshot_targets_safe() {
+    snapshot_directory_chain_safe &&
     [[ ! -L $state && ! -L "$state/health" ]] &&
     [[ ! -L $db && ( ! -e $db || -f $db ) ]] &&
     [[ ! -L $snapshot_lock && ( ! -e $snapshot_lock || -f $snapshot_lock ) ]]
