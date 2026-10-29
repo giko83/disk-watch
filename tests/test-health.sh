@@ -114,6 +114,28 @@ WWN Device Id:                  0000000000000000
 SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
+all_f_serial_wwn)
+ cat <<'TEXT'
+Device Model:                   Drive with all-F serial and valid WWN
+Serial Number:                  FFFFFFFFFFFFFFFF
+LU WWN Device Id:               5 000cca 888888888
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
+all_f_wwn)
+ cat <<'TEXT'
+Device Model:                   Drive with all-F WWN
+WWN Device Id:                  FFFFFFFFFFFFFFFF
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
+all_f_wwn_spaced)
+ cat <<'TEXT'
+Device Model:                   Drive with spaced all-F WWN
+LU WWN Device Id:               F FFFFFF FFFFFFFFF
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 fail)
  echo 'smartctl: device not found' >&2
  exit 2 ;;
@@ -220,6 +242,19 @@ export SMART_SCENARIO=numeric_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="Drive with real numeric serial" {if ($3!="000000001234") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'real numeric serial must retain precedence'
 [[ $(wc -l < "$TMP/calls") -eq 14 ]] || fail 'unexpected placeholder identity probe count'
+# All-F serials/WWNs are unprogrammed sentinels, not unique disk IDs.
+# A usable WWN must still win over an all-F serial; all-F WWNs must fall
+# back to the explicitly supplied path, including when spaced by smartctl.
+export SMART_SCENARIO=all_f_serial_wwn
+bash "$script" health --device /dev/loop97 --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with all-F serial and valid WWN" {if ($3!="wwn:5000cca888888888") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'all-F serial should defer to valid WWN'
+export SMART_SCENARIO=all_f_wwn
+bash "$script" health --device /dev/loop98 --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with all-F WWN" {if ($3!="/dev/loop98") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'all-F WWN should use explicit device path'
+export SMART_SCENARIO=all_f_wwn_spaced
+bash "$script" health --device /dev/loop99 --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="Drive with spaced all-F WWN" {if ($3!="/dev/loop99") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'spaced all-F WWN should use explicit device path'
+[[ $(wc -l < "$TMP/calls") -eq 17 ]] || fail 'unexpected all-F placeholder mock probe count'
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
@@ -300,4 +335,4 @@ for scenario in short extra blank-id unterminated; do
   cmp -s "$TMP/bad-row-original" "$bad_row_state/health/snapshots.tsv" || fail "malformed $scenario history was modified"
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'malformed snapshot rows triggered SMART probe'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including placeholders, history, filters, unsafe storage and snapshot header/row rejection'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and snapshot header/row rejection'
