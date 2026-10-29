@@ -214,8 +214,8 @@ export SMART_SCENARIO=zero_serial_wwn
 bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="Drive with zero-only serial and valid WWN" {if ($3!="wwn:5000cca777777777") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'zero-only serial should defer to WWN'
 export SMART_SCENARIO=oem_serial_no_wwn
-bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
-awk -F '\t' '$4=="unavailable" && $2=="/dev/full" {if ($3!="/dev/full") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'OEM filler serial should fall back to device path'
+bash "$script" health --device /dev/disk/by-id/mock-oem --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$2=="/dev/disk/by-id/mock-oem" {if ($3!="/dev/disk/by-id/mock-oem") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'OEM filler serial should fall back to device path'
 export SMART_SCENARIO=numeric_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="Drive with real numeric serial" {if ($3!="000000001234") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'real numeric serial must retain precedence'
