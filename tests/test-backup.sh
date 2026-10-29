@@ -8,22 +8,28 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 
 mkdir -p "$TMP/live/usr/local/sbin" "$TMP/live/etc/systemd/system" "$TMP/backups"
 script="$TMP/live/usr/local/sbin/disk-watch.sh"
+health="$TMP/live/usr/local/sbin/disk-watch-health.sh"
 unit="$TMP/live/etc/systemd/system/disk-watch.service"
 missing="$TMP/live/etc/systemd/system/disk-watch.timer"
 printf 'old script\n' > "$script"
+printf 'old health helper\n' > "$health"
 printf 'old unit\n' > "$unit"
-chmod 750 "$script"
+chmod 750 "$script" "$health"
 chmod 644 "$unit"
 mkdir -m 700 "$TMP/backups/backup.one"
-bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.one" "$script" "$unit" "$missing" ||
+bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.one" "$script" "$health" "$unit" "$missing" ||
   fail 'valid snapshot failed'
 backup="$TMP/backups/backup.one"
 [[ -f "$backup/.complete" ]] || fail 'complete marker missing'
 cmp -s "$script" "$backup$script" || fail 'script contents differ'
+cmp -s "$health" "$backup$health" || fail 'health helper contents differ'
 cmp -s "$unit" "$backup$unit" || fail 'unit contents differ'
 [[ $(stat -c %a "$backup$script") == 750 ]] || fail 'script permissions lost'
+[[ $(stat -c %a "$backup$health") == 750 ]] || fail 'health helper permissions lost'
 [[ $(stat -c %a "$backup$unit") == 644 ]] || fail 'unit permissions lost'
 grep -Fxq "$script" "$backup/present.txt" || fail 'script not in present manifest'
+grep -Fxq "$health" "$backup/present.txt" || fail 'health helper not in present manifest'
+grep -Fxq 2 "$backup/format.txt" || fail 'versioned snapshot format marker missing'
 grep -Fxq "$unit" "$backup/present.txt" || fail 'unit not in present manifest'
 grep -Fxq "$missing" "$backup/absent.txt" || fail 'missing unit not in absent manifest'
 printf 'new script\n' > "$script"
