@@ -118,8 +118,13 @@ exit 45
 MOCK
 chmod +x "$TMP/mock-bin/cp"
 mkdir -m 700 "$TMP/backups/backup.failed"
-if PATH="$TMP/mock-bin:$PATH" bash -x "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.failed" "$script" > "$TMP/out" 2> "$TMP/err"; then
-  cat "$TMP/err" >&2
+# Verify failure-injection executables really run (a noexec /tmp could
+# silently fall through PATH to the real cp, invalidating the regression).
+if PATH="$TMP/mock-bin:$PATH" cp --version > "$TMP/out" 2> "$TMP/err"; then
+  fail 'copy failure mock was bypassed'
+fi
+grep -Fq 'mock copy failed' "$TMP/err" || fail 'copy failure mock could not execute'
+if PATH="$TMP/mock-bin:$PATH" bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.failed" "$script" > "$TMP/out" 2> "$TMP/err"; then
   fail 'failed copy accepted'
 fi
 [[ ! -e "$TMP/backups/backup.failed/.complete" ]] || fail 'failed copy marked complete'
