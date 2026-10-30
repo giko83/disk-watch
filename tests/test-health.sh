@@ -319,12 +319,15 @@ mkdir -p "$bad_row_state/health"
 valid_header=$(head -n 1 "$st/health/snapshots.tsv")
 valid_row=$(sed -n '2p' "$st/health/snapshots.tsv")
 probes_before=$(wc -l < "$TMP/calls")
-for scenario in short extra blank-id unterminated; do
+for scenario in short extra blank-id unterminated bad-utc-offset bad-calendar bad-clock; do
   printf '%s\n' "$valid_header" > "$bad_row_state/health/snapshots.tsv"
   case $scenario in
     short) printf '2026-10-29T12:00:00Z\t/dev/fake\n' >> "$bad_row_state/health/snapshots.tsv" ;;
     extra) printf '%s\textra\n' "$valid_row" >> "$bad_row_state/health/snapshots.tsv" ;;
     blank-id) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$3=""; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-utc-offset) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-10-29T12:00:00+01:00"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-calendar) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-02-29T12:00:00Z"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-clock) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-10-29T24:00:00Z"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
     unterminated) printf '%s' "$valid_row" >> "$bad_row_state/health/snapshots.tsv" ;;
   esac
   cp "$bad_row_state/health/snapshots.tsv" "$TMP/bad-row-original"
@@ -335,4 +338,14 @@ for scenario in short extra blank-id unterminated; do
   cmp -s "$TMP/bad-row-original" "$bad_row_state/health/snapshots.tsv" || fail "malformed $scenario history was modified"
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'malformed snapshot rows triggered SMART probe'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and snapshot header/row rejection'
+# A valid leap-day UTC timestamp in existing history must remain appendable.
+leap_state="$TMP/health-valid-leap"
+mkdir -p "$leap_state/health"
+printf '%s\n' "$valid_header" > "$leap_state/health/snapshots.tsv"
+printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2024-02-29T23:59:59Z"; print}' >> "$leap_state/health/snapshots.tsv"
+export SMART_SCENARIO=ata
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$leap_state" --format tsv > "$TMP/out"
+[[ $(wc -l < "$TMP/calls") -eq $((probes_before + 1)) ]] || fail 'valid leap day was rejected or probed more than once'
+[[ $(wc -l < "$leap_state/health/snapshots.tsv") -eq 3 ]] || fail 'valid leap-day history did not append'
+grep -Fq '2024-02-29T23:59:59Z' "$leap_state/health/snapshots.tsv" || fail 'valid leap-day history changed'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and UTC snapshot row validation'
