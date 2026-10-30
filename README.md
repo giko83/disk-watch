@@ -11,6 +11,8 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 **Initial public release:** based on a working homelab deployment. Not yet security-audited or broadly tested. This does not replace verified backups.
 
+**SMART history integrity:** an explicit `health --refresh --wake-ok` refuses to wake a disk if saved snapshot rows contain unknown health/self-test statuses or malformed numeric counters (negative, scientific notation, empty, or non-numeric). The old file is not modified; inspect it before manual repair. Cached read-only reports remain available. See [health history validation](docs/health.md).
+
 **Offline CI compatibility:** GitHub Actions checks Bash syntax and the nine mocked regression suites on Ubuntu 22.04/24.04 and Debian 12/13. Debian tests run as an unprivileged user in a read-only container with networking disabled and no disk devices mounted; the runner pulls the image before isolation. This is not proof of live Proxmox, SMART hardware, journald permissions or root installer/rollback compatibility. Run the same suites locally with `for test_script in tests/test-*.sh; do bash "$test_script"; done`. No runtime dependencies change.
 
 ## Requirements
