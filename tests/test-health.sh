@@ -327,7 +327,7 @@ mkdir -p "$bad_row_state/health"
 valid_header=$(head -n 1 "$st/health/snapshots.tsv")
 valid_row=$(sed -n '2p' "$st/health/snapshots.tsv")
 probes_before=$(wc -l < "$TMP/calls")
-for scenario in short extra blank-id unterminated bad-utc-offset bad-calendar bad-clock; do
+for scenario in short extra blank-id unterminated bad-utc-offset bad-calendar bad-clock bad-health bad-test bad-temp bad-hours bad-sectors bad-written bad-wear empty-metric; do
   printf '%s\n' "$valid_header" > "$bad_row_state/health/snapshots.tsv"
   case $scenario in
     short) printf '2026-10-29T12:00:00Z\t/dev/fake\n' >> "$bad_row_state/health/snapshots.tsv" ;;
@@ -336,6 +336,14 @@ for scenario in short extra blank-id unterminated bad-utc-offset bad-calendar ba
     bad-utc-offset) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-10-29T12:00:00+01:00"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
     bad-calendar) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-02-29T12:00:00Z"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
     bad-clock) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$1="2026-10-29T24:00:00Z"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-health) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$5="healthy"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-test) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$13="success"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-temp) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$6="-10"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-hours) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$7="NaN"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-sectors) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$9="2e3"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-written) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$11="1e6"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    bad-wear) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$12="-1"; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
+    empty-metric) printf '%s\n' "$valid_row" | awk -F '\t' 'BEGIN {OFS="\t"} {$8=""; print}' >> "$bad_row_state/health/snapshots.tsv" ;;
     unterminated) printf '%s' "$valid_row" >> "$bad_row_state/health/snapshots.tsv" ;;
   esac
   cp "$bad_row_state/health/snapshots.tsv" "$TMP/bad-row-original"
@@ -356,4 +364,4 @@ bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$leap_
 [[ $(wc -l < "$TMP/calls") -eq $((probes_before + 1)) ]] || fail 'valid leap day was rejected or probed more than once'
 [[ $(wc -l < "$leap_state/health/snapshots.tsv") -eq 3 ]] || fail 'valid leap-day history did not append'
 grep -Fq '2024-02-29T23:59:59Z' "$leap_state/health/snapshots.tsv" || fail 'valid leap-day history changed'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and UTC snapshot row validation'
+echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and UTC/status/numeric snapshot row validation'
