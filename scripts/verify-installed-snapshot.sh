@@ -15,8 +15,19 @@ owner=$(stat -c '%u' -- "$snapshot") || fail 'cannot read snapshot owner'
 mode=$(stat -c '%a' -- "$snapshot") || fail 'cannot read snapshot mode'
 [[ $owner == "$EUID" && $mode == 700 ]] || fail 'snapshot must be owned by the invoking user and mode 700'
 
+# Every verified file must have its own inode. A hard link to a file outside
+# this private snapshot permits external modification after verification and
+# defeats the assumption that the saved recovery material is isolated.
+# Backup creation uses cp -p (not cp -l), so normal snapshots have one link.
+single_link() {
+  local target=$1 links
+  links=$(stat -c '%h' -- "$target") || fail "cannot inspect snapshot link count: $target"
+  [[ $links == 1 ]] || fail "hardlinked snapshot entry: $target"
+}
+
 for name in .complete present.txt absent.txt SHA256SUMS; do
   [[ -f $snapshot/$name && ! -L $snapshot/$name ]] || fail "missing or unsafe $name"
+  single_link "$snapshot/$name"
 done
 [[ $(cat -- "$snapshot/.complete") == complete ]] || fail 'invalid completion marker'
 
@@ -25,6 +36,7 @@ done
 format=1
 if [[ -e $snapshot/format.txt || -L $snapshot/format.txt ]]; then
   [[ -f $snapshot/format.txt && ! -L $snapshot/format.txt ]] || fail 'unsafe snapshot format marker'
+  single_link "$snapshot/format.txt"
   [[ $(cat -- "$snapshot/format.txt") == 2 ]] || fail 'unsupported snapshot format'
   format=2
 fi
@@ -73,6 +85,7 @@ for path in "${paths[@]}"; do
   if ((in_present == 1)); then
     ((present_count += 1))
     [[ -f $snapshot$path && ! -L $snapshot$path ]] || fail "missing or unsafe copied file: $path"
+    single_link "$snapshot$path"
     expected=$(cd -- "$snapshot" && sha256sum -- ".$path") || fail "cannot hash $path"
     matches=$(grep -Fxc -- "$expected" "$snapshot/SHA256SUMS" || true)
     [[ $matches == 1 ]] || fail "checksum mismatch or missing checksum for $path"

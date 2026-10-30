@@ -43,6 +43,34 @@ printf '%s\n' "$health" >> "$TMP/backups/five-path/present.txt"
 verify "$TMP/backups/five-path" > "$TMP/out" || fail 'five-path snapshot rejected'
 grep -Fq '3 present, 2 absent' "$TMP/out" || fail 'wrong five-path summary'
 
+# A complete, checksum-valid snapshot must not share any recovery file inode
+# with a path outside its private directory. Such an alias could be changed
+# independently after verification. Test both copied payload and metadata.
+cp -a -- "$TMP/backups/valid" "$TMP/backups/hardlinked-payload"
+ln -- "$TMP/backups/hardlinked-payload$script" "$TMP/outside-payload-alias"
+payload_before=$(sha256sum -- "$TMP/backups/hardlinked-payload$script")
+reject "$TMP/backups/hardlinked-payload" 'hardlinked recovery payload'
+grep -Fq 'hardlinked snapshot entry:' "$TMP/err" ||
+  fail 'missing hardlinked payload diagnostic'
+[[ $(sha256sum -- "$TMP/backups/hardlinked-payload$script") == "$payload_before" ]] ||
+  fail 'hardlink rejection modified copied payload'
+
+for name in .complete present.txt absent.txt SHA256SUMS; do
+  dir="$TMP/backups/hardlinked-meta-${name//./-}"
+  cp -a -- "$TMP/backups/valid" "$dir"
+  ln -- "$dir/$name" "$TMP/outside-alias-${name//./-}"
+  reject "$dir" "hardlinked $name"
+  grep -Fq 'hardlinked snapshot entry:' "$TMP/err" ||
+    fail "missing hardlinked $name diagnostic"
+done
+cp -a -- "$TMP/backups/five-path" "$TMP/backups/hardlinked-format"
+ln -- "$TMP/backups/hardlinked-format/format.txt" "$TMP/outside-format-alias"
+reject "$TMP/backups/hardlinked-format" 'hardlinked format-2 marker'
+grep -Fq 'hardlinked snapshot entry:' "$TMP/err" ||
+  fail 'missing hardlinked format marker diagnostic'
+verify "$TMP/backups/five-path" > "$TMP/out" ||
+  fail 'normal independent format-2 snapshot rejected after hardlink tests'
+
 # Simulate corruption after the backup helper has marked a format-2 snapshot
 # complete. The installer now uses this same read-only verifier as a mandatory
 # gate before deployment, so a completed but damaged snapshot must fail.
