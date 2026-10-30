@@ -15,17 +15,28 @@ cd "$(dirname "$0")"
 
 # Read-only checks; safe to run as an unprivileged user before deploying.
 preflight() {
-  local file cmd
+  local file cmd links
   # A symlink in the checkout can redirect a root install to unreviewed
   # bytes outside the repository. Only regular source files are accepted.
   [[ -d scripts && ! -L scripts ]] || {
     echo "Preflight failed: unsafe scripts directory (symlink or non-directory)" >&2
     return 1
   }
-  for file in disk-watch.sh disk-watch-health.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh; do
+  for file in install.sh disk-watch.sh disk-watch-health.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
     [[ -f "$file" && ! -L "$file" ]] || {
       echo "Preflight failed: unsafe source file (symlink or non-regular): $file" >&2
+      return 1
+    }
+    # A hard link can alias an unreviewed file outside this checkout, even
+    # though the input appears regular and is not a symlink. Fail closed
+    # before executing checkout helpers or replacing installed files.
+    links=$(stat -c '%h' -- "$file") || {
+      echo "Preflight failed: cannot inspect source link count: $file" >&2
+      return 1
+    }
+    [[ $links == 1 ]] || {
+      echo "Preflight failed: unsafe source file (hardlinked): $file" >&2
       return 1
     }
   done
