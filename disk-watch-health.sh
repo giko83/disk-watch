@@ -84,8 +84,9 @@ if ((refresh)); then
   # GNU stat is needed only for an explicit live refresh.
   snapshot_single_link() {
     local target=$1 links
+    [[ ! -L $target ]] || return 1
     [[ ! -e $target ]] && return 0
-    [[ -f $target && ! -L $target ]] || return 1
+    [[ -f $target ]] || return 1
     links=$(stat -c %h -- "$target") || return 1
     [[ $links == 1 ]]
   }
