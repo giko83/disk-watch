@@ -285,6 +285,37 @@ grep -Fq 'attempted cleanup of partial sandbox files' "$TMP/err" ||
 [[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_failed_copy" ]] ||
   fail 'failed rehearsal changed the source snapshot'
 
+# Metadata may change after the initial verification without affecting the
+# per-file cmp/mode checks. Reverify the source at the end and fail closed,
+# cleaning only the disposable sandbox. Never mutate the original fixture.
+cp -a -- "$TMP/backups/valid" "$TMP/backups/changed-during-rehearsal"
+mkdir -m 700 "$TMP/reject-changed-source" "$TMP/mock-cp-metadata"
+cat > "$TMP/mock-cp-metadata/cp" <<'MOCK_CP_META'
+#!/usr/bin/env bash
+"$REAL_CP" "$@" || exit $?
+if [[ ! -e $MOCK_MARKER ]]; then
+  printf 'modified while copying\\n' >> "$MOCK_SOURCE/SHA256SUMS"
+  : > "$MOCK_MARKER"
+fi
+MOCK_CP_META
+chmod 755 "$TMP/mock-cp-metadata/cp"
+before_source_change=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+if REAL_CP=$(command -v cp) MOCK_SOURCE="$TMP/backups/changed-during-rehearsal" \\
+   MOCK_MARKER="$TMP/metadata-mutated" PATH="$TMP/mock-cp-metadata:$PATH" \\
+   rehearse "$TMP/backups/changed-during-rehearsal" "$TMP/reject-changed-source" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'changed source metadata was accepted after copying'
+fi
+grep -Fq 'source snapshot changed during rehearsal' "$TMP/err" ||
+  fail 'missing post-copy source verification diagnostic'
+grep -Fq 'attempted cleanup of partial sandbox files' "$TMP/err" ||
+  fail 'post-copy source verification did not trigger sandbox cleanup'
+[[ -z $(find "$TMP/reject-changed-source" -mindepth 1 -print -quit) ]] ||
+  fail 'changed source left partial sandbox output'
+[[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_source_change" ]] ||
+  fail 'changed-source fixture modified original saved payloads'
+verify "$TMP/backups/valid" > "$TMP/out" ||
+  fail 'original snapshot rejected after changed-source regression'
+
 mkdir -m 700 "$TMP/reject-tampered"
 if rehearse "$TMP/backups/tampered" "$TMP/reject-tampered" > "$TMP/out" 2> "$TMP/err"; then
   fail 'tampered snapshot was rehearsed'
