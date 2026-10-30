@@ -258,16 +258,23 @@ awk -F '\t' '$4=="Drive with spaced all-F WWN" {if ($3!="/dev/loop99") exit 1; f
 # Reject unsafe snapshot paths before the SMART probe, not just before write.
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
-  "$TMP/health-fifo-lock/health" "$TMP/health-linked-db/health"
+  "$TMP/health-fifo-lock/health" "$TMP/health-linked-db/health" \
+  "$TMP/health-hardlink-lock/health" "$TMP/health-hardlink-db/health" \
+  "$TMP/health-dangling-lock/health" "$TMP/health-dangling-db/health"
 ln -s "$TMP/redirected" "$TMP/health-linked-state"
 ln -s "$TMP/redirected" "$TMP/health-linked-dir/health"
 printf 'DO NOT TOUCH\n' > "$TMP/sentinel"
 ln -s "$TMP/sentinel" "$TMP/health-linked-lock/health/.snapshots.lock"
 ln -s "$TMP/sentinel" "$TMP/health-linked-db/health/snapshots.tsv"
+# Hard links bypass symlink checks but can overwrite an unrelated file.
+ln "$TMP/sentinel" "$TMP/health-hardlink-lock/health/.snapshots.lock"
+ln "$TMP/sentinel" "$TMP/health-hardlink-db/health/snapshots.tsv"
+ln -s "$TMP/missing-lock" "$TMP/health-dangling-lock/health/.snapshots.lock"
+ln -s "$TMP/missing-db" "$TMP/health-dangling-db/health/snapshots.tsv"
 mkfifo "$TMP/health-fifo-lock/health/.snapshots.lock"
 probes_before=$(wc -l < "$TMP/calls")
 export SMART_SCENARIO=ata
-for bad in health-linked-state health-linked-dir health-linked-lock health-linked-db health-fifo-lock; do
+for bad in health-linked-state health-linked-dir health-linked-lock health-linked-db health-fifo-lock health-hardlink-lock health-hardlink-db health-dangling-lock health-dangling-db; do
   if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$TMP/$bad" > "$TMP/out" 2>&1; then
     fail "unsafe snapshot storage $bad was accepted"
   fi
@@ -275,7 +282,8 @@ for bad in health-linked-state health-linked-dir health-linked-lock health-linke
     fail "missing unsafe snapshot storage diagnostic for $bad"
 done
 [[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe storage probed SMART hardware'
-[[ $(cat "$TMP/sentinel") == 'DO NOT TOUCH' ]] || fail 'symlink target was changed'
+[[ $(cat "$TMP/sentinel") == 'DO NOT TOUCH' ]] || fail 'linked target was changed'
+[[ $(stat -c %h -- "$TMP/sentinel") == 3 ]] || fail 'hardlink test setup unexpectedly changed'
 [[ ! -e "$TMP/redirected/snapshots.tsv" ]] || fail 'symlinked directory received snapshot'
 # Ancestors of the state directory must also be checked before SMART access.
 # A symlinked parent is unsafe even when the state/health leaf is not linked.

@@ -79,11 +79,22 @@ if ((refresh)); then
       [[ ! -L $prefix && ( ! -e $prefix || -d $prefix ) ]] || return 1
     done
   }
+  # A regular file can still be a hard link to an unrelated inode. Refuse
+  # multi-linked cache/lock targets before probing or appending as root.
+  # GNU stat is needed only for an explicit live refresh.
+  snapshot_single_link() {
+    local target=$1 links
+    [[ ! -L $target ]] || return 1
+    [[ ! -e $target ]] && return 0
+    [[ -f $target ]] || return 1
+    links=$(stat -c %h -- "$target") || return 1
+    [[ $links == 1 ]]
+  }
   snapshot_targets_safe() {
     snapshot_directory_chain_safe &&
     [[ ! -L $state && ! -L "$state/health" ]] &&
-    [[ ! -L $db && ( ! -e $db || -f $db ) ]] &&
-    [[ ! -L $snapshot_lock && ( ! -e $snapshot_lock || -f $snapshot_lock ) ]]
+    snapshot_single_link "$db" &&
+    snapshot_single_link "$snapshot_lock"
   }
   # An existing nonempty history must use the exact current schema. Check
   # before SMART access so an incompatible file never causes a disk wake-up.
@@ -114,7 +125,7 @@ if ((refresh)); then
       NR > 1 && (NF != 13 || $1 == "" || $2 == "" || $3 == "" || !valid_utc($1)) {exit 1}
     ' "$db"
   }
-  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink, hard link or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
   snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
@@ -158,11 +169,11 @@ if ((refresh)); then
   for i in "${!fields[@]}"; do fields[$i]=$(clean "${fields[$i]}"); done
   umask 077
   mkdir -p -- "$state/health"
-  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink, hard link or non-regular file)' >&2; exit 1; }
   # Append-only open avoids truncating a pre-existing regular lock file.
   exec 9>>"$snapshot_lock"
   flock -x 9
-  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
+  snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink, hard link or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
   snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
   [[ -s $db ]] || printf '%s\n' "$header" > "$db"

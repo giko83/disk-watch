@@ -2,7 +2,9 @@
 
 Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk-watch/issues?q=is%3Aissue). All entries below are **proposals, not implemented features**, until their issues are closed with tested changes and the relevant documentation is updated.
 
-Last curated: 2026-10-29.
+Last curated: 2026-10-30.
+
+**Partial #21 hardlink safety increment:** explicit SMART refresh now rejects snapshot and lock files with multiple hard links (as well as dangling symlinks), before any SMART probe and again under the write lock. Offline tests verify refusal, unchanged shared target bytes and no probe. GNU `stat` is required for opt-in refresh only; cached reads are unchanged. This is best-effort filesystem hardening, not race-proof isolation or complete stable-ID history/retention; #21 remains open.
 
 **Partial #23 identification increment:** common placeholder serial values (UNKNOWN/N/A/NONE/UNAVAILABLE/NOT AVAILABLE/NOT SPECIFIED/OEM filler/zero-only/all-F) and all-zero/all-F WWNs are now excluded from cache identities; a valid WWN is preferred to the device path when the serial is only a placeholder. Offline mocks cover these collisions. Cached opt-in SMART refresh recognizes both `Serial Number:` and SCSI/USB-style `Serial number:` text labels (trimming whitespace). When no serial exists, a validated 16-hex-digit WWN from the same report now supplies a `wwn:<hex>` cache ID; otherwise it falls back to the device path. Offline mocks cover spaced/compact WWNs, path changes, malformed values and serial precedence. This is not /dev/disk/by-id discovery, USB/SAT capability probing, or a never-wake policy; #23 remains open. See [health guide](health.md).
 
