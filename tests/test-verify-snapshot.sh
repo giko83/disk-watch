@@ -294,14 +294,14 @@ cat > "$TMP/mock-cp-metadata/cp" <<'MOCK_CP_META'
 #!/usr/bin/env bash
 "$REAL_CP" "$@" || exit $?
 if [[ ! -e $MOCK_MARKER ]]; then
-  printf 'modified while copying\\n' >> "$MOCK_SOURCE/SHA256SUMS"
+  printf 'modified while copying\n' >> "$MOCK_SOURCE/SHA256SUMS"
   : > "$MOCK_MARKER"
 fi
 MOCK_CP_META
 chmod 755 "$TMP/mock-cp-metadata/cp"
 before_source_change=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
-if REAL_CP=$(command -v cp) MOCK_SOURCE="$TMP/backups/changed-during-rehearsal" \\
-   MOCK_MARKER="$TMP/metadata-mutated" PATH="$TMP/mock-cp-metadata:$PATH" \\
+if REAL_CP=$(command -v cp) MOCK_SOURCE="$TMP/backups/changed-during-rehearsal" \
+   MOCK_MARKER="$TMP/metadata-mutated" PATH="$TMP/mock-cp-metadata:$PATH" \
    rehearse "$TMP/backups/changed-during-rehearsal" "$TMP/reject-changed-source" > "$TMP/out" 2> "$TMP/err"; then
   fail 'changed source metadata was accepted after copying'
 fi
