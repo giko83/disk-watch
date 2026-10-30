@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-30.
 
+**Partial #24 post-copy recovery integrity:** the offline restore rehearsal now independently re-verifies its source snapshot after copying, detecting metadata/checksum/payload changes during rehearsal that individual copied-file comparisons might miss. A mocked mid-copy checksum-manifest mutation must fail and clean only the sandbox; normal four/five-path rehearsals remain supported. Bash and existing GNU tools only; no root, production, systemd or deployment. This is best-effort against races and does not implement real rollback. #24 remains open.
+
 **Partial #24 snapshot hardlink isolation:** the read-only snapshot verifier now rejects hardlinked recovery payloads and metadata (`.complete`, manifests, checksums, format marker) even when their hashes match. Offline fixtures cover external aliases, unchanged saved bytes, normal four/five-path compatibility and explicit refusal. GNU `stat` was already required; no new monitoring dependency, root access or deployment. This is not race-proof, automatic rollback or a live systemd restore. #24 remains open.
 
 **Partial #24 snapshot verification gate:** after the installer creates a completed private five-path pre-install snapshot, it independently verifies the manifest, allowlist, metadata and hashes before replacing any installed file. Offline regressions cover completed-snapshot corruption and installer gate ordering. No new monitoring-runtime dependencies (installer now checks GNU find and cat), root tests, deployment or automatic rollback; real partial-install recovery and systemd restoration remain unverified. #24 remains open.
