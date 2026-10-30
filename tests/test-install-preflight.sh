@@ -45,6 +45,35 @@ grep -Fq 'Preflight OK' "$TMP/out" || fail 'missing success diagnostic'
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'preflight invoked systemctl'
 [[ ! -e "$TMP/source/kernel.cursor" ]] || fail 'preflight created a cursor'
 
+# A symlinked checkout input could make root install an unreviewed external
+# file. Check the read-only preflight without touching any installed path.
+mv "$TMP/source/disk-watch-health.sh" "$TMP/original-health"
+printf '#!/usr/bin/env bash\necho outside\n' > "$TMP/external-health"
+ln -s "$TMP/external-health" "$TMP/source/disk-watch-health.sh"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'symlinked installed source passed preflight'
+fi
+grep -Fq 'unsafe source file (symlink or non-regular): disk-watch-health.sh' "$TMP/err" ||
+  fail 'symlinked source diagnostic absent'
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'symlinked source invoked systemctl'
+rm -- "$TMP/source/disk-watch-health.sh"
+mv "$TMP/original-health" "$TMP/source/disk-watch-health.sh"
+
+# Guard the scripts directory itself: its children can be regular files
+# even when the parent is an alias outside the reviewed checkout.
+mv "$TMP/source/scripts" "$TMP/original-scripts"
+ln -s "$TMP/original-scripts" "$TMP/source/scripts"
+if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+  fail 'symlinked scripts directory passed preflight'
+fi
+grep -Fq 'unsafe scripts directory' "$TMP/err" ||
+  fail 'symlinked scripts directory diagnostic absent'
+[[ ! -e "$TMP/systemctl.called" ]] || fail 'symlinked scripts directory invoked systemctl'
+rm -- "$TMP/source/scripts"
+mv "$TMP/original-scripts" "$TMP/source/scripts"
+bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err" ||
+  fail 'restored regular checkout failed preflight'
+
 mv "$TMP/source/disk-watch.timer" "$TMP/missing-timer"
 if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
   fail 'missing unit file passed preflight'
@@ -232,4 +261,4 @@ if bash "$check" > "$TMP/out" 2> "$TMP/err"; then
 fi
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'config checker invoked systemctl'
 
-echo 'PASS: installer preflight and isolated root-config metadata guard, including unsafe modes and symlinks'
+echo 'PASS: installer preflight, checkout symlink guards and isolated root-config metadata guard'
