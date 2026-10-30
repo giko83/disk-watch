@@ -29,6 +29,18 @@ Replace `/dev/nvme0` with the exact device you have identified. Prefer a persist
 
 `--refresh` and `--wake-ok` are both required. Do **not** run against USB backup disks deliberately configured to remain asleep (such as a Restic backup disk) unless you intentionally accept a spin-up. **Default reports never query hardware**, even if a `--device` filter is present.
 
+## Optional retention on explicit refresh (#21 partial)
+
+The default history is **append-only**. To keep only the latest 100 rows **per saved disk ID**, explicitly opt in on a single authorized refresh:
+
+```sh
+sudo /usr/local/sbin/disk-watch.sh health --device /dev/nvme0 --refresh --wake-ok --retain-per-disk 100
+```
+
+The limit is an integer from 1 to 999999 (no leading zeros). The new sample is included, and the newest N rows for **each** saved ID are retained in original append order, even for other disks. This does not infer chronological order from timestamps, merge old path-based IDs with serial/WWN IDs, or validate that an ID is globally unique. **Older rows are deleted**: first make a private backup of `/var/lib/disk-watch/health/snapshots.tsv` and verify it can be read. Do not use retention when complete forensic history is required. There is no automatic schedule, config default or background pruning.
+
+After the SMART probe, the command holds the existing snapshot lock, revalidates history, stages the candidate and filtered file privately in the same health directory, then replaces `snapshots.tsv` by one filesystem rename. An awk/copy/write failure leaves the previous file unchanged and cleans temporary files best-effort; a sudden crash may leave temporary files to inspect. The existing state directory must be trusted: this is not race-proof against hostile concurrent writers, and no automatic backup or restore is provided. GNU `mktemp`, `mv`, `stat`, `flock`, `awk` and core utilities are required only for explicit live refresh/retention; cached reports do not change. Offline tests: `bash tests/test-health.sh` (mocked smartctl, no root, disks or network).
+
 ## Existing history format guard
 
 Before any explicit SMART probe, refresh rejects snapshot and lock targets that are symlinks (including dangling symlinks), non-regular files or regular files with multiple hard links. This prevents writing to another path sharing the same inode (for example a hardlinked unrelated file). The check runs again before append and under the lock; it is **best-effort, not race-proof**. Use a private, trusted state directory. A hardlinked existing history or lock must be investigated and separated manually; no automatic migration is performed. This check requires GNU `stat` (coreutils) **only for opt-in refresh**, not for cached `status`/`health`/`history` reads. Offline regression: `bash tests/test-health.sh` (no real SMART devices).

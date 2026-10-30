@@ -364,4 +364,52 @@ bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$leap_
 [[ $(wc -l < "$TMP/calls") -eq $((probes_before + 1)) ]] || fail 'valid leap day was rejected or probed more than once'
 [[ $(wc -l < "$leap_state/health/snapshots.tsv") -eq 3 ]] || fail 'valid leap-day history did not append'
 grep -Fq '2024-02-29T23:59:59Z' "$leap_state/health/snapshots.tsv" || fail 'valid leap-day history changed'
+# Opt-in per-ID retention keeps the newest rows without changing the
+# append-only default. All SMART calls here use the local mock.
+retention_state="$TMP/retention state"
+export SMART_SCENARIO=ata
+for i in 1 2 3; do
+  bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$retention_state" >/dev/null
+done
+export SMART_SCENARIO=nvme
+for i in 1 2; do
+  bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$retention_state" >/dev/null
+done
+bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$retention_state" --retain-per-disk 2 >/dev/null
+awk -F '\t' 'NR>1 {n[$3]++} END {if(n["ATA-TEST-0002"]!=2 || n["NVME-TEST-0001"]!=2) exit 1}' "$retention_state/health/snapshots.tsv" || fail 'retention did not keep two newest rows per disk'
+[[ $(wc -l < "$retention_state/health/snapshots.tsv") -eq 5 ]] || fail 'retention damaged header or row count'
+[[ $(stat -c %a "$retention_state/health/snapshots.tsv") == 600 ]] || fail 'retained history is not private'
+probes_before=$(wc -l < "$TMP/calls")
+cp "$retention_state/health/snapshots.tsv" "$TMP/retention-before-invalid"
+for invalid in 0 -1 abc 0001; do
+  if bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$retention_state" --retain-per-disk "$invalid" > "$TMP/out" 2>&1; then
+    fail "invalid retention limit $invalid accepted"
+  fi
+done
+if bash "$script" health --device /dev/null --state-dir "$retention_state" --retain-per-disk 2 > "$TMP/out" 2>&1; then
+  fail 'retention accepted without explicit refresh/wake consent'
+fi
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'invalid retention options probed disk'
+cmp -s "$TMP/retention-before-invalid" "$retention_state/health/snapshots.tsv" || fail 'invalid retention modified history'
+# Failure injection in the pruning awk must preserve the existing file and
+# remove private staging files, even though the explicitly authorized probe ran.
+real_awk=$(command -v awk)
+cat > "$TMP/bin/awk" <<MOCK_AWK
+#!/usr/bin/env bash
+if [[ \${FAIL_RETENTION_AWK:-0} == 1 && "\$*" == *".snapshots-retain-input."* ]]; then exit 87; fi
+exec "$real_awk" "\$@"
+MOCK_AWK
+chmod +x "$TMP/bin/awk"
+if FAIL_RETENTION_AWK=1 bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$retention_state" --retain-per-disk 2 > "$TMP/out" 2>&1; then
+  fail 'retention accepted failed awk generation'
+fi
+grep -Fq 'Cannot build retained SMART history' "$TMP/out" || fail 'retention failure diagnostic missing'
+cmp -s "$TMP/retention-before-invalid" "$retention_state/health/snapshots.tsv" || fail 'failed retention modified history'
+if find "$retention_state/health" -maxdepth 1 -name '.snapshots-retain-*' | grep -q .; then fail 'retention left staging files'; fi
+unset FAIL_RETENTION_AWK
+export SMART_SCENARIO=ata
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$retention_state" --retain-per-disk 1 >/dev/null
+awk -F '\t' 'NR>1 {n[$3]++} END {if(n["ATA-TEST-0002"]!=1 || n["NVME-TEST-0001"]!=1) exit 1}' "$retention_state/health/snapshots.tsv" || fail 'one-per-disk retention failed'
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$retention_state" >/dev/null
+awk -F '\t' 'NR>1 {n[$3]++} END {if(n["ATA-TEST-0002"]!=2 || n["NVME-TEST-0001"]!=1) exit 1}' "$retention_state/health/snapshots.tsv" || fail 'default append-only behavior changed'
 echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and UTC/status/numeric snapshot row validation'

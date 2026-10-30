@@ -16,6 +16,7 @@ Options:
   --device ID        Explicit /dev path for refresh, or cached path/serial filter
   --refresh          Save a fresh SMART snapshot (health only)
   --wake-ok          Required with --refresh: SMART may spin up sleeping disks
+  --retain-per-disk N  Opt-in retention on refresh: keep newest N rows per ID (1..999999)
 Reading existing reports never calls smartctl, journalctl or any disk device.
 HELP
 }
@@ -23,15 +24,16 @@ HELP
 action=$1; shift
 case $action in status|disks|health|history|report) ;; *) help >&2; exit 2;; esac
 state=${DISK_WATCH_STATE_DIR:-/var/lib/disk-watch}
-format=text device='' since='' refresh=0 wake=0
+format=text device='' since='' refresh=0 wake=0 retain=0 retain_set=0
 while (($#)); do
  case $1 in
   --help|-h) help; exit 0 ;;
-  --state-dir|--format|--device|--since)
+  --state-dir|--format|--device|--since|--retain-per-disk)
     key=$1
     (($# >= 2)) && [[ -n $2 ]] || { echo "Missing value: $key" >&2; exit 2; }
     case $key in
       --state-dir) state=$2;; --format) format=$2;; --device) device=$2;; --since) since=$2;;
+      --retain-per-disk) retain=$2; retain_set=1;;
     esac
     shift 2;;
   --refresh) refresh=1; shift;;
@@ -43,6 +45,12 @@ done
 [[ -z $since || ( $action == report && $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ) ]] || { echo 'Use report --since YYYY-MM-DD' >&2; exit 2; }
 [[ -z $device || $action == history || $action == health ]] || { echo 'Only health/history accept --device' >&2; exit 2; }
 [[ $action != history || -n $device ]] || { echo 'history requires --device' >&2; exit 2; }
+if ((retain_set)); then
+  [[ $retain =~ ^[1-9][0-9]{0,5}$ ]] || { echo 'Use --retain-per-disk N with an integer from 1 to 999999' >&2; exit 2; }
+  [[ $action == health && $refresh == 1 && $wake == 1 && -n $device ]] || {
+    echo '--retain-per-disk requires health --device /dev/DEVICE --refresh --wake-ok' >&2; exit 2;
+  }
+fi
 if ((refresh || wake)); then
   [[ $action == health && $refresh == 1 && $wake == 1 && -n $device ]] || {
     echo 'Live read requires health --device /dev/DEVICE --refresh --wake-ok' >&2; exit 2;
@@ -186,9 +194,56 @@ if ((refresh)); then
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink, hard link or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }
   snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
-  [[ -s $db ]] || printf '%s\n' "$header" > "$db"
-  (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
-  chmod 600 "$db"
+  if ((retain_set)); then
+    # Retention is explicitly requested, never automatic. Build the complete
+    # candidate in a private file, keep the last N rows for each saved ID in
+    # append order, then atomically replace the history under the same lock.
+    # If generation fails, leave the existing history byte-for-byte intact.
+    retention_input='' retention_output=''
+    retention_cleanup() {
+      [[ -z $retention_input ]] || rm -f -- "$retention_input"
+      [[ -z $retention_output ]] || rm -f -- "$retention_output"
+    }
+    trap retention_cleanup EXIT
+    retention_input=$(mktemp "$state/health/.snapshots-retain-input.XXXXXXXX") || {
+      echo 'Cannot stage retained SMART history' >&2; exit 1;
+    }
+    retention_output=$(mktemp "$state/health/.snapshots-retain-output.XXXXXXXX") || {
+      echo 'Cannot stage retained SMART history' >&2; exit 1;
+    }
+    if [[ -s $db ]]; then
+      cat -- "$db" > "$retention_input" || { echo 'Cannot read SMART history for retention' >&2; exit 1; }
+    else
+      printf '%s\n' "$header" > "$retention_input" || { echo 'Cannot stage SMART history header' >&2; exit 1; }
+    fi
+    (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$retention_input" || {
+      echo 'Cannot stage new SMART snapshot' >&2; exit 1;
+    }
+    # First pass counts each ID, second pass retains only its newest N rows.
+    # No -v ID interpolation: firmware serials may contain backslashes.
+    if ! awk -F '\t' -v max="$retain" '
+      FNR==NR {if (FNR>1) total[$3]++; next}
+      FNR==1 {print; next}
+      {seen[$3]++; if (seen[$3] > total[$3]-max) print}
+    ' "$retention_input" "$retention_input" > "$retention_output"; then
+      echo 'Cannot build retained SMART history; existing history preserved' >&2; exit 1
+    fi
+    [[ -s $retention_output ]] || { echo 'Empty retained SMART history; refusing replacement' >&2; exit 1; }
+    chmod 600 -- "$retention_output" || { echo 'Cannot protect retained SMART history' >&2; exit 1; }
+    snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path during retention' >&2; exit 1; }
+    snapshot_header_safe && snapshot_rows_safe || {
+      echo 'SMART history changed during retention; refusing replacement' >&2; exit 1;
+    }
+    mv -f -- "$retention_output" "$db" || { echo 'Cannot publish retained SMART history' >&2; exit 1; }
+    retention_output=''
+    rm -f -- "$retention_input"
+    retention_input=''
+    trap - EXIT
+  else
+    [[ -s $db ]] || printf '%s\n' "$header" > "$db"
+    (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
+    chmod 600 "$db"
+  fi
   flock -u 9
   echo "Saved SMART snapshot for $id; reported health: $health (not a guarantee of reliability)" >&2
 fi
