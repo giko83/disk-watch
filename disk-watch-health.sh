@@ -216,64 +216,7 @@ if ((refresh)); then
     else
       printf '%s\n' "$header" > "$retention_input" || { echo 'Cannot stage SMART history header' >&2; exit 1; }
     fi
-    (IFS=
-  echo "Saved SMART snapshot for $id; reported health: $health (not a guarantee of reliability)" >&2
-fi
-# Everything after the optional explicit refresh is read-only and disk-safe.
-# For status, TSV is key/value data rather than the snapshot row schema.
-if [[ $action == status ]]; then
-  if [[ $format == tsv ]]; then
-    printf 'metric\tvalue\n'
-    if [[ -s "$state/kernel.cursor" ]]; then printf 'journal_cursor\tavailable\n'
-    else printf 'journal_cursor\tunavailable\n'; fi
-  else
-    echo 'Disk Watch cached status (no device access)'
-    if [[ -s "$state/kernel.cursor" ]]; then echo 'Journal cursor: available'
-    else echo 'Journal cursor: unavailable'; fi
-  fi
-  if [[ -s "$db" ]]; then
-    stats=$(awk -F '\t' 'NR>1 && NF>=13 {n++; a[$3]=1; last=$1} END {for(k in a) d++; printf "%d\t%d\t%s", n,d,(last==""?"unavailable":last)}' "$db")
-  else stats=$'0\t0\tunavailable'; fi
-  IFS=$'\t' read -r n d last <<<"$stats"
-  if [[ $format == tsv ]]; then
-    printf 'snapshots\t%s\ndisks\t%s\nlast_snapshot\t%s\nlast_alert\tunavailable\n' "$n" "$d" "$last"
-  else
-    printf 'Snapshots: %s\nDisks with snapshots: %s\nLast snapshot: %s\n' "$n" "$d" "$last"
-    echo 'Last alert: unavailable (event history not yet persisted)'
-    [[ $n != 0 ]] || echo 'SMART history: unavailable (no saved snapshots)'
-  fi
-  exit 0
-fi
-if [[ $format == tsv ]]; then printf '%s\n' "$header"; fi
-if [[ ! -s $db ]]; then
-  [[ $format != text ]] || echo 'SMART history: unavailable (no saved snapshots).'
-  exit 0
-fi
-# Format as compact records rather than a very wide TSV row in terminals.
-format_rows() {
-  if [[ $format == tsv ]]; then cat
-  else awk -F '\t' 'NF>=13 {
-    printf "Disk: %s (%s)\nLast seen: %s | SMART: %s | Last test: %s\n", $3,$4,$1,$5,$13;
-    printf "Temp: %s C | Hours: %s | Reallocated: %s | Pending: %s\n", $6,$7,$8,$9;
-    printf "Media errors: %s | Written: %s GB | Wear: %s %% | Path: %s\n\n", $10,$11,$12,$2;
-  }'
-  fi
-}
-# No smartctl/journalctl calls below this line. Column 3 uses a firmware
-# serial if available; otherwise the explicit path. Never infer health from
-# fields marked unavailable.
-case $action in
- disks|health)
-   awk -F '\t' -v wanted="$device" 'NR>1 && NF>=13 && (wanted=="" || $2==wanted || $3==wanted) {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t $'\t' -k3,3 | format_rows
-   ;;
- history)
-   awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db" | format_rows
-   ;;
- report)
-   awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db" | format_rows
-   ;;
-esac
-\t'; printf '%s\n' "${fields[*]}") >> "$retention_input" || {
+    (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$retention_input" || {
       echo 'Cannot stage new SMART snapshot' >&2; exit 1;
     }
     # First pass counts each ID, second pass retains only its newest N rows.
@@ -298,64 +241,7 @@ esac
     trap - EXIT
   else
     [[ -s $db ]] || printf '%s\n' "$header" > "$db"
-    (IFS=
-  echo "Saved SMART snapshot for $id; reported health: $health (not a guarantee of reliability)" >&2
-fi
-# Everything after the optional explicit refresh is read-only and disk-safe.
-# For status, TSV is key/value data rather than the snapshot row schema.
-if [[ $action == status ]]; then
-  if [[ $format == tsv ]]; then
-    printf 'metric\tvalue\n'
-    if [[ -s "$state/kernel.cursor" ]]; then printf 'journal_cursor\tavailable\n'
-    else printf 'journal_cursor\tunavailable\n'; fi
-  else
-    echo 'Disk Watch cached status (no device access)'
-    if [[ -s "$state/kernel.cursor" ]]; then echo 'Journal cursor: available'
-    else echo 'Journal cursor: unavailable'; fi
-  fi
-  if [[ -s "$db" ]]; then
-    stats=$(awk -F '\t' 'NR>1 && NF>=13 {n++; a[$3]=1; last=$1} END {for(k in a) d++; printf "%d\t%d\t%s", n,d,(last==""?"unavailable":last)}' "$db")
-  else stats=$'0\t0\tunavailable'; fi
-  IFS=$'\t' read -r n d last <<<"$stats"
-  if [[ $format == tsv ]]; then
-    printf 'snapshots\t%s\ndisks\t%s\nlast_snapshot\t%s\nlast_alert\tunavailable\n' "$n" "$d" "$last"
-  else
-    printf 'Snapshots: %s\nDisks with snapshots: %s\nLast snapshot: %s\n' "$n" "$d" "$last"
-    echo 'Last alert: unavailable (event history not yet persisted)'
-    [[ $n != 0 ]] || echo 'SMART history: unavailable (no saved snapshots)'
-  fi
-  exit 0
-fi
-if [[ $format == tsv ]]; then printf '%s\n' "$header"; fi
-if [[ ! -s $db ]]; then
-  [[ $format != text ]] || echo 'SMART history: unavailable (no saved snapshots).'
-  exit 0
-fi
-# Format as compact records rather than a very wide TSV row in terminals.
-format_rows() {
-  if [[ $format == tsv ]]; then cat
-  else awk -F '\t' 'NF>=13 {
-    printf "Disk: %s (%s)\nLast seen: %s | SMART: %s | Last test: %s\n", $3,$4,$1,$5,$13;
-    printf "Temp: %s C | Hours: %s | Reallocated: %s | Pending: %s\n", $6,$7,$8,$9;
-    printf "Media errors: %s | Written: %s GB | Wear: %s %% | Path: %s\n\n", $10,$11,$12,$2;
-  }'
-  fi
-}
-# No smartctl/journalctl calls below this line. Column 3 uses a firmware
-# serial if available; otherwise the explicit path. Never infer health from
-# fields marked unavailable.
-case $action in
- disks|health)
-   awk -F '\t' -v wanted="$device" 'NR>1 && NF>=13 && (wanted=="" || $2==wanted || $3==wanted) {latest[$3]=$0} END {for(k in latest) print latest[k]}' "$db" | sort -t $'\t' -k3,3 | format_rows
-   ;;
- history)
-   awk -F '\t' -v x="$device" 'NR>1 && NF>=13 && ($2==x || $3==x) {print}' "$db" | format_rows
-   ;;
- report)
-   awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db" | format_rows
-   ;;
-esac
-\t'; printf '%s\n' "${fields[*]}") >> "$db"
+    (IFS=$'\t'; printf '%s\n' "${fields[*]}") >> "$db"
     chmod 600 "$db"
   fi
   flock -u 9

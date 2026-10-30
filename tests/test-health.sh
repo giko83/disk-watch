@@ -396,7 +396,7 @@ cmp -s "$TMP/retention-before-invalid" "$retention_state/health/snapshots.tsv" |
 real_awk=$(command -v awk)
 cat > "$TMP/bin/awk" <<MOCK_AWK
 #!/usr/bin/env bash
-if [[ ${FAIL_RETENTION_AWK:-0} == 1 && "\$*" == *".snapshots-retain-input."* ]]; then exit 87; fi
+if [[ \${FAIL_RETENTION_AWK:-0} == 1 && "\$*" == *".snapshots-retain-input."* ]]; then exit 87; fi
 exec "$real_awk" "\$@"
 MOCK_AWK
 chmod +x "$TMP/bin/awk"
