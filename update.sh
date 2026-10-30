@@ -5,16 +5,19 @@ set -euo pipefail
 REPO_DIR=${DISK_WATCH_REPO:-/opt/disk-watch}
 [[ -d "$REPO_DIR/.git" ]] || { echo "Not a Git checkout: $REPO_DIR" >&2; exit 1; }
 cd "$REPO_DIR"
-if ! git_status=$(git status --porcelain); then
+if ! git_status=$(git -c core.fsmonitor=false status --porcelain); then
   echo 'Cannot inspect Git checkout; update aborted' >&2
   exit 1
 fi
 [[ -z $git_status ]] || { echo 'Checkout has local modifications; update aborted' >&2; exit 1; }
 old=$(git rev-parse HEAD)
-git pull --ff-only
-# Git hooks or other local changes during pull can leave an unsafe working tree.
+# This updater runs as root: suppress repository hooks during pull and any
+# configured fsmonitor command during status/pull. This is not a sandbox for
+# other Git helpers, filters or the installation itself.
+git -c core.hooksPath=/dev/null -c core.fsmonitor=false pull --ff-only
+# Other local changes during pull can still leave an unsafe working tree.
 # Do not run the installer from modified sources, even if pre-pull status was clean.
-if ! git_status=$(git status --porcelain); then
+if ! git_status=$(git -c core.fsmonitor=false status --porcelain); then
   echo "Cannot inspect Git checkout after pull; installed files were not replaced. Previous revision: $old" >&2
   exit 1
 fi

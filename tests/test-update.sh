@@ -22,9 +22,10 @@ cat > "$TMP/mock-bin/git" <<'MOCK'
 #!/usr/bin/env bash
 printf 'git %s\n' "$*" >> "$MOCK_LOG"
 case "$*" in
-  'status --porcelain')
+  '-c core.fsmonitor=false status --porcelain')
     # The first status runs before pull; the second verifies the pulled tree.
-    if grep -Fxq 'git pull --ff-only' "$MOCK_LOG"; then
+    # Exact command matching ensures fsmonitor stays disabled in both checks.
+    if grep -Fxq 'git -c core.hooksPath=/dev/null -c core.fsmonitor=false pull --ff-only' "$MOCK_LOG"; then
       [[ ${MOCK_STATUS_FAIL:-} != after ]] || { echo 'mock post-pull status failure' >&2; exit 55; }
       if [[ ${MOCK_DIRTY_AFTER_PULL:-0} == 1 ]]; then echo ' M install.sh'; fi
     else
@@ -33,7 +34,7 @@ case "$*" in
     fi
     ;;
   'rev-parse HEAD') echo 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' ;;
-  'pull --ff-only')
+  '-c core.hooksPath=/dev/null -c core.fsmonitor=false pull --ff-only')
     if [[ ${MOCK_PULL_FAIL:-0} == 1 ]]; then echo 'mock pull failed' >&2; exit 41; fi
     ;;
   'rev-parse --short HEAD') echo 'bbbbbbb' ;;
@@ -83,7 +84,7 @@ grep -Fq 'Cannot inspect Git checkout; update aborted' "$TMP/err" || fail 'initi
 if MOCK_PULL_FAIL=1 bash "$RUNNER" > "$TMP/out" 2> "$TMP/err"; then
   fail 'failed pull accepted'
 fi
-grep -Fxq 'git pull --ff-only' "$MOCK_LOG" || fail 'updater did not require fast-forward pull'
+grep -Fxq 'git -c core.hooksPath=/dev/null -c core.fsmonitor=false pull --ff-only' "$MOCK_LOG" || fail 'updater did not require fast-forward pull with hooks/fsmonitor disabled'
 ! grep -Fq 'install' "$MOCK_LOG" || fail 'failed pull triggered installer'
 
 : > "$MOCK_LOG"
@@ -119,10 +120,10 @@ grep -Fxq 'install' "$MOCK_LOG" || fail 'installation was not attempted'
 : > "$MOCK_LOG"
 bash "$RUNNER" > "$TMP/out" 2> "$TMP/err" || fail 'clean update failed'
 cat > "$TMP/expected" <<'EXPECTED'
-git status --porcelain
+git -c core.fsmonitor=false status --porcelain
 git rev-parse HEAD
-git pull --ff-only
-git status --porcelain
+git -c core.hooksPath=/dev/null -c core.fsmonitor=false pull --ff-only
+git -c core.fsmonitor=false status --porcelain
 install --preflight
 install
 git rev-parse --short HEAD
@@ -130,4 +131,4 @@ EXPECTED
 diff -u "$TMP/expected" "$MOCK_LOG" || fail 'update operations ran out of order'
 grep -Fq 'Disk Watch updated to bbbbbbb' "$TMP/out" || fail 'success diagnostic absent'
 
-echo 'PASS: offline updater checkout, pre/post-pull status failures, post-pull dirty-tree, fast-forward, preflight, deployment failure and success flow'
+echo 'PASS: offline updater checkout, pre/post-pull status failures, post-pull dirty-tree, hook/fsmonitor-suppressed fast-forward, preflight, deployment failure and success flow'
