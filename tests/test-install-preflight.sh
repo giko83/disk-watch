@@ -87,6 +87,25 @@ mv "$TMP/original-scripts" "$TMP/source/scripts"
 bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err" ||
   fail 'restored regular checkout failed preflight'
 
+# A hard link has no symlink marker but can share an inode with a file
+# outside the checkout. Reject deploy inputs, recovery helpers and even
+# the installer itself before any root or systemctl operation.
+for linked in disk-watch-health.sh scripts/backup-installed.sh install.sh; do
+  alias="$TMP/alias-$(basename "$linked")"
+  ln "$TMP/source/$linked" "$alias"
+  if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
+    fail "hardlinked checkout input $linked passed preflight"
+  fi
+  grep -Fq "unsafe source file (hardlinked): $linked" "$TMP/err" ||
+    fail "missing hardlink diagnostic for $linked"
+  cmp -s "$TMP/source/$linked" "$alias" ||
+    fail "hardlink contents changed for $linked"
+  [[ ! -e "$TMP/systemctl.called" ]] || fail "hardlink preflight invoked systemctl"
+  rm -- "$alias"
+  bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err" ||
+    fail "ordinary checkout rejected after unlinking $linked"
+done
+
 mv "$TMP/source/disk-watch.timer" "$TMP/missing-timer"
 if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
   fail 'missing unit file passed preflight'
@@ -274,4 +293,4 @@ if bash "$check" > "$TMP/out" 2> "$TMP/err"; then
 fi
 [[ ! -e "$TMP/systemctl.called" ]] || fail 'config checker invoked systemctl'
 
-echo 'PASS: installer preflight, checkout symlink guards and isolated root-config metadata guard'
+echo 'PASS: installer preflight, checkout symlink/hardlink guards and isolated root-config metadata guard'
