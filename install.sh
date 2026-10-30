@@ -16,8 +16,18 @@ cd "$(dirname "$0")"
 # Read-only checks; safe to run as an unprivileged user before deploying.
 preflight() {
   local file cmd
+  # A symlink in the checkout can redirect a root install to unreviewed
+  # bytes outside the repository. Only regular source files are accepted.
+  [[ -d scripts && ! -L scripts ]] || {
+    echo "Preflight failed: unsafe scripts directory (symlink or non-directory)" >&2
+    return 1
+  }
   for file in disk-watch.sh disk-watch-health.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
+    [[ -f "$file" && ! -L "$file" ]] || {
+      echo "Preflight failed: unsafe source file (symlink or non-regular): $file" >&2
+      return 1
+    }
   done
 
   (bash -n disk-watch.sh && bash -n disk-watch-health.sh && bash -n install.sh && bash -n update.sh && bash -n scripts/backup-installed.sh && bash -n scripts/check-config.sh &&
