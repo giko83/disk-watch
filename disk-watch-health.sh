@@ -105,7 +105,7 @@ if ((refresh)); then
     IFS= read -r existing_header < "$db" || return 1
     [[ $existing_header == "$header" ]]
   }
-  # Existing rows must have the expected 13 fields, valid UTC timestamps and a final newline.
+  # Existing rows must have 13 fields, valid UTC timestamps, recognized metric/status values and a final newline.
   # Otherwise an append can silently join a truncated last row or mix schemas.
   # This is a read-only check, repeated under the append lock.
   snapshot_rows_safe() {
@@ -122,7 +122,17 @@ if ((refresh)); then
         days=(mo==2 ? ((y%4==0 && (y%100!=0 || y%400==0)) ? 29 : 28) : ((mo==4 || mo==6 || mo==9 || mo==11) ? 30 : 31))
         return d>=1 && d<=days
       }
+      # These are the values the writer emits; reject corrupted numeric/status
+      # fields before a live probe, rather than mixing them into the history.
+      # NVMe percentage-used can legitimately exceed 100.
+      function valid_count(v) {return v == "unavailable" || v ~ /^[0-9]+$/}
+      function valid_written(v) {return v == "unavailable" || v ~ /^[0-9]+([.][0-9]+)?$/}
       NR > 1 && (NF != 13 || $1 == "" || $2 == "" || $3 == "" || !valid_utc($1)) {exit 1}
+      NR > 1 && ($5 !~ /^(passed|failed|unavailable)$/ ||
+                 $13 !~ /^(unavailable|in_progress|completed_ok|failed_or_interrupted)$/ ||
+                 !valid_count($6) || !valid_count($7) || !valid_count($8) ||
+                 !valid_count($9) || !valid_count($10) || !valid_written($11) ||
+                 !valid_count($12)) {exit 1}
     ' "$db"
   }
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink, hard link or non-regular file)' >&2; exit 1; }
