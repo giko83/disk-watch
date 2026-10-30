@@ -68,5 +68,11 @@ for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-health.sh /
     ((count += 1))
   fi
 done
+# The snapshot was verified before copying, but a local process could change
+# its manifest, hashes or payload while the rehearsal is in progress. Recheck
+# the source after the last copy, before declaring success. The EXIT trap
+# removes only sandbox output on failure; this is not a race-proof guarantee.
+bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2 ||
+  fail 'source snapshot changed during rehearsal'
 printf 'Restore rehearsal passed: %d copied file(s) under %s. No live paths or services changed.\n' "$count" "$sandbox"
 echo 'This is not a root-level rollback test. Inspect and remove the sandbox manually.'
