@@ -43,6 +43,18 @@ printf '%s\n' "$health" >> "$TMP/backups/five-path/present.txt"
 verify "$TMP/backups/five-path" > "$TMP/out" || fail 'five-path snapshot rejected'
 grep -Fq '3 present, 2 absent' "$TMP/out" || fail 'wrong five-path summary'
 
+# Simulate corruption after the backup helper has marked a format-2 snapshot
+# complete. The installer now uses this same read-only verifier as a mandatory
+# gate before deployment, so a completed but damaged snapshot must fail.
+cp -a -- "$TMP/backups/five-path" "$TMP/backups/five-path-corrupted"
+printf 'corrupted after backup\n' > "$TMP/backups/five-path-corrupted$health"
+hash_before=$(sha256sum "$TMP/backups/five-path-corrupted$health")
+reject "$TMP/backups/five-path-corrupted" 'completed format-2 snapshot corrupted after backup'
+[[ $(sha256sum "$TMP/backups/five-path-corrupted$health") == "$hash_before" ]] ||
+  fail 'verification modified corrupted snapshot'
+verify "$TMP/backups/five-path" > "$TMP/out" ||
+  fail 'original verified format-2 snapshot rejected after corruption test'
+
 cp -a -- "$TMP/backups/five-path" "$TMP/backups/five-path-missing"
 sed -i "\\|^$health$|d" "$TMP/backups/five-path-missing/present.txt"
 reject "$TMP/backups/five-path-missing" 'format 2 missing health manifest entry'

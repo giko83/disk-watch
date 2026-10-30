@@ -43,7 +43,7 @@ preflight() {
 
   # Core runtime and deployment tools only. curl/sendmail/smartctl are optional
   # and depend on the selected notification and SMART integrations.
-  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat sha256sum awk sort; do
+  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat sha256sum awk sort find cat; do
     command -v "$cmd" >/dev/null 2>&1 || {
       echo "Preflight failed: required command not found: $cmd" >&2
       return 1
@@ -111,7 +111,14 @@ if ! bash ./scripts/backup-installed.sh "$backup_dir" \
   echo "Backup failed; no installed files replaced. Incomplete snapshot: $backup_dir" >&2
   exit 1
 fi
-echo "Pre-install snapshot saved: $backup_dir"
+# A completed marker is not enough: independently verify the five-path
+# manifest, private ownership/mode and every saved checksum immediately before
+# replacing any installed file. If verification fails, leave host files alone.
+if ! bash ./scripts/verify-installed-snapshot.sh "$backup_dir"; then
+  echo "Snapshot verification failed; no installed files replaced. Inspect: $backup_dir" >&2
+  exit 1
+fi
+echo "Pre-install snapshot verified: $backup_dir"
 
 install -m 750 disk-watch.sh disk-watch-health.sh disk-watch-smart.sh /usr/local/sbin/
 install -m 644 disk-watch.service disk-watch.timer /etc/systemd/system/
