@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-30.
 
+**Partial #24 snapshot verification gate:** after the installer creates a completed private five-path pre-install snapshot, it independently verifies the manifest, allowlist, metadata and hashes before replacing any installed file. Offline regressions cover completed-snapshot corruption and installer gate ordering. No new dependencies, root tests, deployment or automatic rollback; real partial-install recovery and systemd restoration remain unverified. #24 remains open.
+
 **Partial #24 checkout-source guard:** read-only installer preflight now rejects symlinked required checkout files and a symlinked `scripts/` directory before any root deployment. Offline regression covers both refusal paths and a normal checkout. No new runtime dependencies, host changes or deployment; this does not validate root rollback, defend against hostile hard links or eliminate filesystem races. #24 remains open.
 
 **Partial #24 installed-source alias safety:** pre-install snapshotting now refuses existing installed scripts/units with multiple hard links, before creating any manifest or replacing host files. Offline mocks verify no snapshot artifacts, unchanged shared source bytes, and acceptance after unlinking the alias. GNU `stat` was already required; this is a best-effort guard, not root rollback or protection against filesystem races. #24 remains open.

@@ -4,6 +4,15 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# The installer must verify the completed snapshot AFTER backup and BEFORE
+# the first write to installed paths. The verifier itself is exercised with
+# valid, corrupted and incomplete fixtures in test-verify-snapshot.sh.
+awk '
+  /if ! bash \.\/scripts\/backup-installed.sh/ {backup=NR}
+  /if ! bash \.\/scripts\/verify-installed-snapshot.sh "\$backup_dir"/ {verify=NR}
+  /install -m 750 disk-watch.sh/ {deploy=NR}
+  END {exit !(backup > 0 && verify > backup && deploy > verify)}
+' "$ROOT/install.sh" || { echo 'FAIL: missing pre-deployment snapshot verification gate' >&2; exit 1; }
 # Guard against omitting a deployed executable from the pre-install snapshot.
 grep -Fq '/usr/local/sbin/disk-watch-health.sh \' "$ROOT/install.sh" ||
   { echo 'FAIL: installer backup omits disk-watch-health.sh' >&2; exit 1; }

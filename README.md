@@ -15,6 +15,8 @@ A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram al
 
 **Installer source safety:** `bash install.sh --preflight` rejects symlinked required checkout files and a symlinked `scripts/` directory before any root deployment. Use regular files from a reviewed checkout; this is a best-effort input guard, not a sandbox or proof of safe root rollback. Offline regression: `bash tests/test-install-preflight.sh`. No new dependencies or host changes.
 
+**Pre-deployment backup integrity:** after creating its private five-path snapshot, `install.sh` now runs `scripts/verify-installed-snapshot.sh` and refuses to replace installed files if the completed snapshot is corrupt, incomplete, has unsafe metadata or fails checksums. The failure prints the snapshot path for inspection. Offline tests: `bash tests/test-verify-snapshot.sh` and `bash tests/test-install-preflight.sh`; they do not exercise root/systemd. This does **not** automatically roll back a partial installation, and filesystem races remain possible. No new runtime dependencies or changes to config, cursor or host state from the tests.
+
 **Offline CI compatibility:** GitHub Actions checks Bash syntax and the nine mocked regression suites on Ubuntu 22.04/24.04 and Debian 12/13. Debian tests run as an unprivileged user in a read-only container with networking disabled and no disk devices mounted; the runner pulls the image before isolation. This is not proof of live Proxmox, SMART hardware, journald permissions or root installer/rollback compatibility. Run the same suites locally with `for test_script in tests/test-*.sh; do bash "$test_script"; done`. No runtime dependencies change.
 
 ## Requirements
