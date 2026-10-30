@@ -13,6 +13,10 @@ awk '
   /install -m 750 disk-watch.sh/ {deploy=NR}
   END {exit !(backup > 0 && verify > backup && deploy > verify)}
 ' "$ROOT/install.sh" || { echo 'FAIL: missing pre-deployment snapshot verification gate' >&2; exit 1; }
+# The now-mandatory verifier uses GNU find and cat. Keep both in preflight
+# so a missing tool cannot cause a failure only after a backup is created.
+grep -Fq 'awk sort find cat; do' "$ROOT/install.sh" ||
+  { echo 'FAIL: installer preflight omits snapshot-verifier prerequisites' >&2; exit 1; }
 # Guard against omitting a deployed executable from the pre-install snapshot.
 grep -Fq '/usr/local/sbin/disk-watch-health.sh \' "$ROOT/install.sh" ||
   { echo 'FAIL: installer backup omits disk-watch-health.sh' >&2; exit 1; }
