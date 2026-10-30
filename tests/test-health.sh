@@ -259,7 +259,8 @@ awk -F '\t' '$4=="Drive with spaced all-F WWN" {if ($3!="/dev/loop99") exit 1; f
 # A symlinked lock must not truncate its target; a FIFO must not hang refresh.
 mkdir -p "$TMP/redirected" "$TMP/health-linked-dir" "$TMP/health-linked-lock/health" \
   "$TMP/health-fifo-lock/health" "$TMP/health-linked-db/health" \
-  "$TMP/health-hardlink-lock/health" "$TMP/health-hardlink-db/health"
+  "$TMP/health-hardlink-lock/health" "$TMP/health-hardlink-db/health" \
+  "$TMP/health-dangling-lock/health" "$TMP/health-dangling-db/health"
 ln -s "$TMP/redirected" "$TMP/health-linked-state"
 ln -s "$TMP/redirected" "$TMP/health-linked-dir/health"
 printf 'DO NOT TOUCH\n' > "$TMP/sentinel"
@@ -268,10 +269,12 @@ ln -s "$TMP/sentinel" "$TMP/health-linked-db/health/snapshots.tsv"
 # Hard links bypass symlink checks but can overwrite an unrelated file.
 ln "$TMP/sentinel" "$TMP/health-hardlink-lock/health/.snapshots.lock"
 ln "$TMP/sentinel" "$TMP/health-hardlink-db/health/snapshots.tsv"
+ln -s "$TMP/missing-lock" "$TMP/health-dangling-lock/health/.snapshots.lock"
+ln -s "$TMP/missing-db" "$TMP/health-dangling-db/health/snapshots.tsv"
 mkfifo "$TMP/health-fifo-lock/health/.snapshots.lock"
 probes_before=$(wc -l < "$TMP/calls")
 export SMART_SCENARIO=ata
-for bad in health-linked-state health-linked-dir health-linked-lock health-linked-db health-fifo-lock health-hardlink-lock health-hardlink-db; do
+for bad in health-linked-state health-linked-dir health-linked-lock health-linked-db health-fifo-lock health-hardlink-lock health-hardlink-db health-dangling-lock health-dangling-db; do
   if bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$TMP/$bad" > "$TMP/out" 2>&1; then
     fail "unsafe snapshot storage $bad was accepted"
   fi
