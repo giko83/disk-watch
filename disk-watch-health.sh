@@ -94,13 +94,25 @@ if ((refresh)); then
     IFS= read -r existing_header < "$db" || return 1
     [[ $existing_header == "$header" ]]
   }
-  # Existing rows must have the expected 13 fields and a final newline.
+  # Existing rows must have the expected 13 fields, valid UTC timestamps and a final newline.
   # Otherwise an append can silently join a truncated last row or mix schemas.
   # This is a read-only check, repeated under the append lock.
   snapshot_rows_safe() {
     [[ -s $db ]] || return 0
     [[ $(tail -c 1 -- "$db"; printf '.') == $'\n.' ]] || return 1
-    awk -F '\t' 'NR > 1 && (NF != 13 || $1 == "" || $2 == "" || $3 == "") {exit 1}' "$db"
+    awk -F '\t' '
+      # Validate UTC calendar timestamps without date(1) or external dependencies.
+      # This checks Gregorian day ranges (including leap years), not leap seconds.
+      function valid_utc(s, y, mo, d, h, mi, sec, days) {
+        if (s !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/) return 0
+        y=substr(s,1,4)+0; mo=substr(s,6,2)+0; d=substr(s,9,2)+0
+        h=substr(s,12,2)+0; mi=substr(s,15,2)+0; sec=substr(s,18,2)+0
+        if (y<1 || mo<1 || mo>12 || h>23 || mi>59 || sec>60) return 0
+        days=(mo==2 ? ((y%4==0 && (y%100!=0 || y%400==0)) ? 29 : 28) : ((mo==4 || mo==6 || mo==9 || mo==11) ? 30 : 31))
+        return d>=1 && d<=days
+      }
+      NR > 1 && (NF != 13 || $1 == "" || $2 == "" || $3 == "" || !valid_utc($1)) {exit 1}
+    ' "$db"
   }
   snapshot_targets_safe || { echo 'Unsafe SMART snapshot storage path (symlink or non-regular file)' >&2; exit 1; }
   snapshot_header_safe || { echo 'Incompatible SMART snapshot header; refusing to append' >&2; exit 1; }

@@ -31,16 +31,17 @@ Replace `/dev/nvme0` with the exact device you have identified. Prefer a persist
 
 ## Existing history format guard
 
-An explicit `health --refresh --wake-ok` refuses to append if the existing nonempty `health/snapshots.tsv` has a different header from the current 13-column schema, or if that header lacks its terminating newline. It also rejects existing data rows with a field count other than 13, missing timestamp/device/ID, or a final line without a newline (which would otherwise be joined to the next appended record). These checks happen **before smartctl**, so rejected history does not wake the disk; they repeat under the snapshot lock. The existing file is left unchanged, and cached read commands are unaffected. Validation scans the existing history on each explicit refresh; it does not validate metric semantics, migrate schemas, repair damaged data or protect against concurrent hostile filesystem changes.
+An explicit `health --refresh --wake-ok` refuses to append if the existing nonempty `health/snapshots.tsv` has a different header from the current 13-column schema, or if that header lacks its terminating newline. It also rejects existing data rows with a field count other than 13, missing timestamp/device/ID, a malformed UTC timestamp (including invalid Gregorian dates or times), or a final line without a newline (which would otherwise be joined to the next appended record). These checks happen **before smartctl**, so rejected history does not wake the disk; they repeat under the snapshot lock. The existing file is left unchanged, and cached read commands are unaffected. Validation scans the existing history on each explicit refresh; it does not validate metric semantics or leap-second authenticity, migrate schemas, repair damaged data or protect against concurrent hostile filesystem changes.
 
 To diagnose the mismatch without changing the file, inspect the first line, for example:
 
 ```sh
 sudo head -n 1 /var/lib/disk-watch/health/snapshots.tsv
 sudo awk -F '\t' 'NR>1 && (NF!=13 || $1=="" || $2=="" || $3=="") {print "invalid row:", NR}' /var/lib/disk-watch/health/snapshots.tsv
+sudo awk -F '\t' 'NR>1 && $1 !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/ {print "invalid UTC shape:", NR}' /var/lib/disk-watch/health/snapshots.tsv
 ```
 
-Preserve the original history and investigate the schema or damaged rows before attempting any manual conversion. The example detects column-count/required-field problems; an unterminated final row must be checked separately. Refresh uses existing Bash, `awk` and GNU coreutils (`tail`); no new runtime service or hardware probe is required. Older/custom history is not silently rewritten.
+Preserve the original history and investigate the schema or damaged rows before attempting any manual conversion. The examples detect column-count/required-field problems and timestamp shape, but not invalid calendar days or clock ranges; refresh performs those additional checks. An unterminated final row must be checked separately. Refresh uses existing Bash, `awk` and GNU coreutils (`tail`); no new runtime service or hardware probe is required. Older/custom history is not silently rewritten.
 
 ## Snapshot fields
 
