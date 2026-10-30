@@ -60,6 +60,19 @@ for src in "$@"; do
     echo "Backup failed: not a regular file: $src" >&2
     exit 1
   fi
+  # Installed scripts/units should be independent files. A hardlinked source
+  # can alias unrelated data and must not silently enter a recovery snapshot.
+  # GNU stat is already required by the installer and snapshot verifier.
+  if [[ -f "$src" ]]; then
+    links=$(stat -c %h -- "$src") || {
+      echo "Backup failed: cannot inspect source link count: $src" >&2
+      exit 1
+    }
+    [[ $links == 1 ]] || {
+      echo "Backup failed: refusing hardlinked source: $src" >&2
+      exit 1
+    }
+  fi
   # Duplicate inputs would produce repeated manifest records. Such a
   # snapshot could be marked complete but would fail strict verification.
   occurrences=0

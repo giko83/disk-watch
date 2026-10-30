@@ -86,6 +86,30 @@ grep -Fq 'must be empty' "$TMP/err" || fail 'missing non-empty-directory diagnos
 grep -Fq 'keep me' "$TMP/backups/backup.notempty/.hidden" || fail 'preexisting file was overwritten'
 [[ ! -e "$TMP/backups/backup.notempty/.complete" ]] || fail 'non-empty snapshot marked complete'
 
+# A hardlinked installed file may alias unrelated content. Refuse it before
+# creating any snapshot manifests, and do not change either shared inode.
+printf "shared installed content\n" > "$TMP/live/hardlink-source"
+ln "$TMP/live/hardlink-source" "$TMP/live/hardlink-alias"
+mkdir -m 700 "$TMP/backups/backup.hardlink"
+if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.hardlink" \
+  "$TMP/live/hardlink-source" > "$TMP/out" 2> "$TMP/err"; then
+  fail "hardlinked installed source accepted"
+fi
+grep -Fq "refusing hardlinked source" "$TMP/err" || fail "missing hardlink diagnostic"
+[[ -z $(find "$TMP/backups/backup.hardlink" -mindepth 1 -print -quit) ]] || \
+  fail "hardlinked source created snapshot contents"
+grep -Fxq "shared installed content" "$TMP/live/hardlink-source" || \
+  fail "hardlinked source contents changed"
+cmp -s "$TMP/live/hardlink-source" "$TMP/live/hardlink-alias" || \
+  fail "hardlink alias contents changed"
+# Once the extra link is removed, the same ordinary source is eligible.
+rm -- "$TMP/live/hardlink-alias"
+mkdir -m 700 "$TMP/backups/backup.singlelink"
+bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.singlelink" \
+  "$TMP/live/hardlink-source" || fail "single-link source rejected"
+[[ -f "$TMP/backups/backup.singlelink/.complete" ]] || \
+  fail "single-link snapshot not completed"
+
 ln -s "$script" "$TMP/live/linked"
 mkdir -m 700 "$TMP/backups/backup.symlink"
 if bash "$ROOT/scripts/backup-installed.sh" "$TMP/backups/backup.symlink" "$TMP/live/linked" > "$TMP/out" 2> "$TMP/err"; then

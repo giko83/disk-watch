@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-30.
 
+**Partial #24 installed-source alias safety:** pre-install snapshotting now refuses existing installed scripts/units with multiple hard links, before creating any manifest or replacing host files. Offline mocks verify no snapshot artifacts, unchanged shared source bytes, and acceptance after unlinking the alias. GNU `stat` was already required; this is a best-effort guard, not root rollback or protection against filesystem races. #24 remains open.
+
 **Partial #21 metric-integrity increment:** explicit SMART refresh now refuses existing history with unknown health/self-test statuses or malformed numeric counters, before hardware access and again under the append lock. Offline fixtures check rejection, no probe, unchanged bytes, and valid-history compatibility. This does not add raw SMART provenance, retention, stable IDs on all devices or automatic repair; #21 remains open.
 
 **Partial #21 hardlink safety increment:** explicit SMART refresh now rejects snapshot and lock files with multiple hard links (as well as dangling symlinks), before any SMART probe and again under the write lock. Offline tests verify refusal, unchanged shared target bytes and no probe. GNU `stat` is required for opt-in refresh only; cached reads are unchanged. This is best-effort filesystem hardening, not race-proof isolation or complete stable-ID history/retention; #21 remains open.
