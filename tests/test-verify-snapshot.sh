@@ -180,6 +180,28 @@ printf 'complete\n' > "$TMP/backups/empty/.complete"
 verify "$TMP/backups/empty" > "$TMP/out" || fail 'valid empty snapshot rejected'
 grep -Fq '0 present, 4 absent' "$TMP/out" || fail 'wrong empty summary'
 
+# A name-only directory allowlist must not accept a regular file or FIFO
+# masquerading as an allowed ancestor in an otherwise all-absent snapshot.
+# Neither failed check may change the manifests or source bytes.
+cp -a -- "$TMP/backups/empty" "$TMP/backups/ancestor-regular"
+printf 'not a directory\n' > "$TMP/backups/ancestor-regular/usr"
+before_ancestor=$(sha256sum -- "$TMP/backups/ancestor-regular/usr")
+reject "$TMP/backups/ancestor-regular" 'regular file at allowed ancestor usr'
+grep -Fq 'unsafe recovery directory: usr' "$TMP/err" ||
+  fail 'missing regular ancestor diagnostic'
+[[ $(sha256sum -- "$TMP/backups/ancestor-regular/usr") == "$before_ancestor" ]] ||
+  fail 'regular ancestor was modified by read-only verification'
+cp -a -- "$TMP/backups/empty" "$TMP/backups/ancestor-fifo"
+mkdir -p -- "$TMP/backups/ancestor-fifo/etc"
+mkfifo -- "$TMP/backups/ancestor-fifo/etc/systemd"
+reject "$TMP/backups/ancestor-fifo" 'FIFO at allowed nested ancestor etc/systemd'
+grep -Fq 'unsafe recovery directory: etc/systemd' "$TMP/err" ||
+  fail 'missing FIFO ancestor diagnostic'
+[[ -p "$TMP/backups/ancestor-fifo/etc/systemd" ]] ||
+  fail 'FIFO ancestor was modified by read-only verification'
+verify "$TMP/backups/empty" > "$TMP/out" ||
+  fail 'unchanged all-absent snapshot rejected after ancestor-type tests'
+
 # A recovery plan is read-only and only describes the four allowlisted paths.
 plan() { bash "$ROOT/scripts/plan-installed-restore.sh" "$1"; }
 before=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
