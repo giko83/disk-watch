@@ -10,6 +10,22 @@ fi
 snapshot=$1
 fail() { echo "Snapshot verification failed: $*" >&2; exit 1; }
 
+# A symlink in an ancestor can redirect a seemingly private snapshot outside
+# its reviewed location. Checking only the final directory also misses a
+# symlink passed with a trailing slash. Reject each component before reading
+# metadata; this remains best-effort against concurrent filesystem changes.
+snapshot_path_chain_safe() {
+  local rest=$snapshot part prefix
+  if [[ $rest == /* ]]; then prefix=/; rest=${rest#/}; else prefix=.; fi
+  while [[ -n $rest ]]; do
+    part=${rest%%/*}
+    if [[ $rest == */* ]]; then rest=${rest#*/}; else rest=''; fi
+    [[ -z $part || $part == . ]] && continue
+    prefix="${prefix%/}/$part"
+    [[ -d $prefix && ! -L $prefix ]] || return 1
+  done
+}
+snapshot_path_chain_safe || fail 'symlink or non-directory snapshot path ancestor'
 [[ -d $snapshot && ! -L $snapshot ]] || fail 'snapshot is not a regular directory'
 owner=$(stat -c '%u' -- "$snapshot") || fail 'cannot read snapshot owner'
 mode=$(stat -c '%a' -- "$snapshot") || fail 'cannot read snapshot mode'

@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-31.
 
+**Partial #24 snapshot path ancestry:** read-only recovery verification now refuses a symlink anywhere in the supplied snapshot directory path (including parent aliases and trailing-slash symlinks) before reading manifests. Offline fixtures confirm refusal, unchanged saved bytes and normal legacy/format-2 compatibility. Bash only for the new check; existing GNU tools remain required for verification. Best-effort against races, not live rollback; #24 stays open for root/systemd recovery tests.
+
 **Partial #24 ancestor type validation:** strict read-only snapshot verification now requires every present allowlisted recovery ancestor to be a real directory, rejecting a regular file or FIFO disguised by an allowed name even in all-absent snapshots. Offline fixtures cover top-level and nested cases, unchanged bytes and normal empty/legacy/format-2 compatibility. Existing Bash/GNU tools only; no root, systemd, live rollback or deployment. #24 stays open for real recovery and systemd validation.
 
 **Partial #24 strict directory allowlist:** read-only pre-install snapshot verification now rejects unlisted directories even if empty, as well as unlisted files. Only ancestors of fixed recovery paths are allowed. The sandbox rehearsal checks nested/aliased source locations before strict verification so its dedicated refusal remains testable. Offline regressions cover top-level and nested empty extras, normal legacy/format-2/empty snapshots and no host writes. Bash/GNU find/coreutils already required; no root/systemd deployment or live rollback. #24 remains open.
