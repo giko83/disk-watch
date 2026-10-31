@@ -32,6 +32,21 @@ snapshot_real=$(cd -- "$snapshot" && pwd -P) || fail 'cannot resolve snapshot di
 sandbox_real=$(cd -- "$sandbox" && pwd -P) || fail 'cannot resolve sandbox directory'
 [[ $sandbox_real != "$snapshot_real" && $sandbox_real != "$snapshot_real"/* ]] ||
   fail 'sandbox must be outside the snapshot directory'
+# A private sandbox leaf can still be reached through a symlinked parent, or
+# a symlinked leaf with a trailing slash. Reject every path component before
+# writing any sandbox file. This is best-effort against concurrent path swaps.
+sandbox_path_chain_safe() {
+  local rest=${sandbox#/} part prefix=/
+  while [[ -n $rest ]]; do
+    part=${rest%%/*}
+    if [[ $rest == */* ]]; then rest=${rest#*/}; else rest=''; fi
+    [[ -z $part ]] && continue
+    prefix="${prefix%/}/$part"
+    [[ -d $prefix && ! -L $prefix ]] || return 1
+  done
+}
+sandbox_path_chain_safe ||
+  fail 'sandbox path contains a symlink or non-directory ancestor'
 # Verify the entire source snapshot before creating any sandbox subdirectory.
 bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2
 

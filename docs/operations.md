@@ -91,6 +91,8 @@ The planner is intentionally read-only: it does not copy, remove, `chmod`, run `
 
 ### Offline restore rehearsal (sandbox only)
 
+The sandbox directory and **every ancestor** must be real directories, not symlinks. The rehearsal now rejects parent symlink aliases and trailing-slash leaf aliases before copying, even if the resolved directory is private and empty. Pass the direct path returned by `mktemp -d`; do not use an aliased parent. This Bash-only best-effort guard is tested by `bash tests/test-verify-snapshot.sh` offline and does not prevent concurrent path replacement or prove root/systemd rollback.
+
 Before attempting manual recovery, you can rehearse file copying into a **new empty private directory**. This detects a broken or unreadable backup without writing to installed paths:
 
 ```sh

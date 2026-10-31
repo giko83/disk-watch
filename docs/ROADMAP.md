@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-31.
 
+**Partial #24 rehearsal sandbox path ancestry:** the offline restore rehearsal now rejects symlinks in every component of its destination sandbox path, including a symlinked parent and a trailing-slash leaf, before any copy. Offline mocks verify refusal, unchanged saved bytes and normal direct private sandbox compatibility. Bash only for the new check; no root, systemd, hardware, live rollback or deployment. Best-effort against concurrent path swaps; #24 stays open.
+
 **Partial #24 snapshot path ancestry:** read-only recovery verification now refuses a symlink anywhere in the supplied snapshot directory path (including parent aliases and trailing-slash symlinks) before reading manifests. Offline fixtures confirm refusal, unchanged saved bytes and normal legacy/format-2 compatibility. Bash only for the new check; existing GNU tools remain required for verification. Best-effort against races, not live rollback; #24 stays open for root/systemd recovery tests.
 
 **Partial #24 ancestor type validation:** strict read-only snapshot verification now requires every present allowlisted recovery ancestor to be a real directory, rejecting a regular file or FIFO disguised by an allowed name even in all-absent snapshots. Offline fixtures cover top-level and nested cases, unchanged bytes and normal empty/legacy/format-2 compatibility. Existing Bash/GNU tools only; no root, systemd, live rollback or deployment. #24 stays open for real recovery and systemd validation.
