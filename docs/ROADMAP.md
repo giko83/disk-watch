@@ -4,6 +4,8 @@ Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk
 
 Last curated: 2026-10-31.
 
+**Partial #24 final sandbox consistency:** after the last offline restore-rehearsal copy, every copied sandbox file is rechecked for regular-file type, content and mode. Offline mocked later-copy mutation of an earlier destination (bytes or permissions) now fails and cleans only sandbox files, while a clean retry passes. Bash and existing GNU `cmp`/`stat` tools only; no root/systemd/network/hardware, live rollback or race-free guarantee. #24 remains open.
+
 **Partial #24 rehearsal sandbox path ancestry:** the offline restore rehearsal now rejects symlinks in every component of its destination sandbox path, including a symlinked parent and a trailing-slash leaf, before any copy. Offline mocks verify refusal, unchanged saved bytes and normal direct private sandbox compatibility. Bash only for the new check; no root, systemd, hardware, live rollback or deployment. Best-effort against concurrent path swaps; #24 stays open.
 
 **Partial #24 snapshot path ancestry:** read-only recovery verification now refuses a symlink anywhere in the supplied snapshot directory path (including parent aliases and trailing-slash symlinks) before reading manifests. Offline fixtures confirm refusal, unchanged saved bytes and normal legacy/format-2 compatibility. Bash only for the new check; existing GNU tools remain required for verification. Best-effort against races, not live rollback; #24 stays open for root/systemd recovery tests.
