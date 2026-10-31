@@ -125,6 +125,20 @@ mkdir -p "$TMP/backups/unlisted-nested/other"
 printf 'unexpected\n' > "$TMP/backups/unlisted-nested/other/file"
 reject "$TMP/backups/unlisted-nested" 'unlisted nested file'
 
+# Even empty directories are unmanifested snapshot content. Reject both a
+# top-level directory and an extra child under an otherwise allowed parent.
+# Valid four/five-path and empty snapshots still pass unchanged.
+make_snapshot unlisted-empty-directory
+mkdir -p "$TMP/backups/unlisted-empty-directory/extra-empty"
+reject "$TMP/backups/unlisted-empty-directory" 'unlisted empty directory'
+grep -Fq 'unlisted snapshot entry: extra-empty' "$TMP/err" ||
+  fail 'missing unlisted empty directory diagnostic'
+make_snapshot unlisted-empty-nested
+mkdir -p "$TMP/backups/unlisted-empty-nested/usr/local/sbin/extra-empty"
+reject "$TMP/backups/unlisted-empty-nested" 'unlisted empty nested directory'
+grep -Fq 'unlisted snapshot entry: usr/local/sbin/extra-empty' "$TMP/err" ||
+  fail 'missing nested empty directory diagnostic'
+
 make_snapshot absent
 printf 'should not exist\n' > "$TMP/backups/absent$missing"
 reject "$TMP/backups/absent" 'copied file declared absent'
