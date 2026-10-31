@@ -272,6 +272,10 @@ grep -Fq 'sandbox must be outside the snapshot directory' "$TMP/err" ||
   fail 'aliased nested sandbox was written to'
 [[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_nested" ]] ||
   fail 'nested rehearsal modified source snapshot files'
+# The stricter snapshot allowlist now rejects even empty unexpected folders.
+# Remove these deliberately invalid sandbox fixtures before later positive
+# verification/rehearsal tests reuse the original valid snapshot.
+rmdir -- "$TMP/backups/valid/nested-sandbox" "$TMP/backups/valid/alias-sandbox"
 
 # A failed copy after an earlier successful copy must leave no partial files
 # or directories in the private sandbox; the verified source stays unchanged.
