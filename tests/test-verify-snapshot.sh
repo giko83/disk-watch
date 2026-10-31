@@ -33,6 +33,22 @@ grep -Fq 'health.sh was NOT captured' "$TMP/err" ||
   fail 'legacy snapshot did not warn about missing health helper'
 grep -Fq '2 present, 2 absent' "$TMP/out" || fail 'wrong summary'
 
+# A private leaf is not sufficient when an ancestor is a symlink. Refuse
+# both a symlinked parent and a trailing-slash alias before reading metadata.
+# No snapshot payload or external target may be modified by verification.
+before_ancestor=$(sha256sum -- "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+ln -s -- "$TMP/backups" "$TMP/linked-backups"
+reject "$TMP/linked-backups/valid" 'symlinked snapshot parent'
+grep -Fq 'symlink or non-directory snapshot path ancestor' "$TMP/err" ||
+  fail 'missing symlinked parent diagnostic'
+reject "$TMP/linked-backups/valid/" 'symlinked snapshot parent with trailing slash'
+ln -s -- "$TMP/backups/valid" "$TMP/linked-snapshot"
+reject "$TMP/linked-snapshot/" 'symlinked snapshot leaf with trailing slash'
+[[ $(sha256sum -- "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_ancestor" ]] ||
+  fail 'symlinked path refusal changed saved recovery files'
+verify "$TMP/backups/valid" > "$TMP/out" ||
+  fail 'normal snapshot rejected after symlinked ancestor tests'
+
 # Format 2 includes the health helper, which the installer deploys. A missing
 # health manifest entry must be rejected rather than treated as a legacy backup.
 cp -a -- "$TMP/backups/valid" "$TMP/backups/five-path"
