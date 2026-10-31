@@ -315,6 +315,33 @@ grep -Fq 'sandbox must be outside the snapshot directory' "$TMP/err" ||
 # verification/rehearsal tests reuse the original valid snapshot.
 rmdir -- "$TMP/backups/valid/nested-sandbox" "$TMP/backups/valid/alias-sandbox"
 
+# The sandbox leaf must not be reached through a symlinked ancestor, even
+# when the final directory is private, empty and owned by this user. A
+# trailing slash must not hide a symlinked sandbox leaf either.
+mkdir -m 700 "$TMP/sandbox-parent" "$TMP/sandbox-parent/empty"
+ln -s -- "$TMP/sandbox-parent" "$TMP/sandbox-parent-alias"
+before_sandbox_alias=$(sha256sum -- "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+if rehearse "$TMP/backups/valid" "$TMP/sandbox-parent-alias/empty" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'sandbox with symlinked parent was accepted'
+fi
+grep -Fq 'sandbox path contains a symlink or non-directory ancestor' "$TMP/err" ||
+  fail 'missing symlinked sandbox parent diagnostic'
+ln -s -- "$TMP/sandbox-parent/empty" "$TMP/sandbox-leaf-alias"
+if rehearse "$TMP/backups/valid" "$TMP/sandbox-leaf-alias/" > "$TMP/out" 2> "$TMP/err"; then
+  fail 'sandbox with trailing-slash symlinked leaf was accepted'
+fi
+grep -Fq 'sandbox path contains a symlink or non-directory ancestor' "$TMP/err" ||
+  fail 'missing trailing-slash sandbox leaf diagnostic'
+[[ -z $(find "$TMP/sandbox-parent/empty" -mindepth 1 -print -quit) ]] ||
+  fail 'symlinked sandbox destination was written to'
+[[ $(sha256sum -- "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_sandbox_alias" ]] ||
+  fail 'sandbox path rejection modified source recovery files'
+mkdir -m 700 "$TMP/sandbox-parent/direct"
+rehearse "$TMP/backups/valid" "$TMP/sandbox-parent/direct" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'ordinary nested private sandbox was rejected'
+cmp -s "$TMP/backups/valid$script" "$TMP/sandbox-parent/direct$script" ||
+  fail 'ordinary nested private sandbox did not receive the saved monitor'
+
 # A failed copy after an earlier successful copy must leave no partial files
 # or directories in the private sandbox; the verified source stays unchanged.
 mkdir -m 700 "$TMP/reject-copy"
