@@ -139,6 +139,14 @@ TEXT
 fail)
  echo 'smartctl: device not found' >&2
  exit 2 ;;
+status_1|status_2|status_4|status_128)
+ cat <<'TEXT'
+Model Number:                       SMART status bitmask fixture
+Serial Number:                      STATUS-TEST-0004
+SMART overall-health self-assessment test result: PASSED
+Temperature:                        32 Celsius
+TEXT
+ exit "${SMART_SCENARIO#status_}" ;;
 *)
  echo 'unexpected scenario' >&2; exit 3;;
 esac
@@ -412,4 +420,33 @@ bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$reten
 awk -F '\t' 'NR>1 {n[$3]++} END {if(n["ATA-TEST-0002"]!=1 || n["NVME-TEST-0001"]!=1) exit 1}' "$retention_state/health/snapshots.tsv" || fail 'one-per-disk retention failed'
 bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$retention_state" >/dev/null
 awk -F '\t' 'NR>1 {n[$3]++} END {if(n["ATA-TEST-0002"]!=2 || n["NVME-TEST-0001"]!=1) exit 1}' "$retention_state/health/snapshots.tsv" || fail 'default append-only behavior changed'
-echo 'PASS: offline cached health, explicit wake guard, NVMe/ATA and SCSI/USB serial/WWN identity including zero/all-F placeholders, history, filters, unsafe storage and UTC/status/numeric snapshot row validation'
+# smartctl exit status is a bitmask. Even a plausible SMART header must not
+# be persisted if command, device-open or SMART-command bits (0-2) are set.
+# In particular, opt-in retention must not prune history on such a failure.
+cp "$retention_state/health/snapshots.tsv" "$TMP/status-mask-original"
+probes_before=$(wc -l < "$TMP/calls")
+for code in 1 2 4; do
+  export SMART_SCENARIO="status_$code"
+  if bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$retention_state" --retain-per-disk 1 > "$TMP/out" 2>&1; then
+    fail "smartctl acquisition error bit $code accepted despite valid-looking header"
+  fi
+  grep -Fq "SMART acquisition failed (smartctl exit mask $code" "$TMP/out" ||
+    fail "missing smartctl exit-mask diagnostic for $code"
+  cmp -s "$TMP/status-mask-original" "$retention_state/health/snapshots.tsv" ||
+    fail "failed smartctl status $code changed or pruned existing history"
+done
+[[ $(wc -l < "$TMP/calls") -eq $((probes_before + 3)) ]] ||
+  fail 'smartctl exit-mask rejection made unexpected number of probes'
+if find "$retention_state/health" -maxdepth 1 -name '.snapshots-retain-*' | grep -q .; then
+  fail 'smartctl acquisition error left retention staging files'
+fi
+# Higher status bits are health/error-log findings, not acquisition failure.
+# Preserve a usable report even with bit 7 set (existing NVMe mock covers bit 3).
+export SMART_SCENARIO=status_128
+status_state="$TMP/status-mask-accepted"
+bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$status_state" --format tsv > "$TMP/out"
+[[ $(wc -l < "$status_state/health/snapshots.tsv") -eq 2 ]] ||
+  fail 'smartctl health-status bit 7 incorrectly rejected usable snapshot'
+grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
+  fail 'smartctl high-bit snapshot content missing'
+echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'

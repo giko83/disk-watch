@@ -148,7 +148,17 @@ if ((refresh)); then
   snapshot_rows_safe || { echo 'Malformed SMART snapshot rows; refusing to append' >&2; exit 1; }
   command -v smartctl >/dev/null || { echo 'smartctl required only for live refresh' >&2; exit 1; }
   echo "SMART read from $device may wake disk" >&2
-  raw=$(smartctl -a -- "$device" 2>&1) || :
+  # smartctl uses an eight-bit exit mask, not a simple success/failure code.
+  # Bits 0-2 mean invalid arguments, device open/identify failure, or failed
+  # SMART command. Do not save a misleading partial snapshot even if a bridge
+  # printed a plausible model/health header before reporting an access error.
+  # Bits 3-7 indicate disk health findings and can accompany usable reports.
+  smart_status=0
+  raw=$(smartctl -a -- "$device" 2>&1) || smart_status=$?
+  if ((smart_status & 7)); then
+    echo "SMART acquisition failed (smartctl exit mask $smart_status; command/device/SMART access error); snapshot not saved" >&2
+    exit 1
+  fi
   grep -Eq '^(Model Number|Device Model|SMART overall-health self-assessment test result|SMART Health Status|SMART/Health Information)' <<<"$raw" || { echo 'No readable SMART report; snapshot not saved' >&2; exit 1; }
   model=$(awk -F: '/^(Device Model|Model Number):/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' <<<"$raw")
   # SCSI/USB bridges may use "Serial number:" rather than "Serial Number:".

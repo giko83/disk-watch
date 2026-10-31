@@ -29,6 +29,12 @@ Replace `/dev/nvme0` with the exact device you have identified. Prefer a persist
 
 `--refresh` and `--wake-ok` are both required. Do **not** run against USB backup disks deliberately configured to remain asleep (such as a Restic backup disk) unless you intentionally accept a spin-up. **Default reports never query hardware**, even if a `--device` filter is present.
 
+## SMART acquisition failures (partial #21)
+
+`smartctl -a` returns an **eight-bit status mask**, not a Boolean. On an explicitly authorized `health --device /dev/DEVICE --refresh --wake-ok`, Disk Watch now refuses to append a snapshot when any of bits 0–2 is set: invalid command line (1), device open/identify failure (2), or SMART command failure (4). A USB bridge may print a plausible model/health header and still report an access error; that partial output is **not** saved as trustworthy history. The command returns nonzero and reports the numeric mask without echoing the raw device output. Example: `SMART acquisition failed (smartctl exit mask 2; command/device/SMART access error); snapshot not saved`.
+
+Bits 3–7 (8, 16, 32, 64, 128) indicate SMART health findings or error/self-test logs; they are **not** by themselves a reason to discard a readable report. For example, a report with exit mask 8 can still produce a saved snapshot with the reported health fields. A rejected acquisition does not run retention or modify existing snapshot history; cached commands never call `smartctl`. This is conservative: some USB bridges may produce partial useful data with bit 2 set, but such data is intentionally not recorded as a valid snapshot. No extra hardware probe, dependency, schema migration or automatic polling is introduced. Offline regression: `bash tests/test-health.sh`, with synthetic reports returning masks 1, 2, 4, 8 and 128. **Remaining:** acquisition failures and raw reports are not persisted as separate timestamped events; real USB/SAT/Proxmox validation is outstanding.
+
 ## Optional retention on explicit refresh (#21 partial)
 
 The default history is **append-only**. To keep only the latest 100 rows **per saved disk ID**, explicitly opt in on a single authorized refresh:
