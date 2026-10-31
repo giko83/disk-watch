@@ -84,6 +84,19 @@ for path in /usr/local/sbin/disk-watch.sh /usr/local/sbin/disk-watch-health.sh /
     ((count += 1))
   fi
 done
+# A later copy can alter an earlier sandbox file after its immediate cmp/mode
+# check. Recheck every copied destination at the end, before reporting success.
+# This is a best-effort consistency check, not protection against concurrent
+# path replacement; cleanup remains confined to this disposable sandbox.
+for file in "${created_files[@]}"; do
+  path=${file#"$sandbox"}
+  [[ -f $file && ! -L $file ]] ||
+    fail "sandbox file changed after copying: $path"
+  cmp -s -- "$snapshot$path" "$file" ||
+    fail "sandbox contents changed after copying: $path"
+  [[ $(stat -c '%a' -- "$file") == $(stat -c '%a' -- "$snapshot$path") ]] ||
+    fail "sandbox permissions changed after copying: $path"
+done
 # The snapshot was verified before copying, but a local process could change
 # its manifest, hashes or payload while the rehearsal is in progress. Recheck
 # the source after the last copy, before declaring success. The EXIT trap

@@ -368,6 +368,46 @@ grep -Fq 'attempted cleanup of partial sandbox files' "$TMP/err" ||
 [[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_failed_copy" ]] ||
   fail 'failed rehearsal changed the source snapshot'
 
+# A later copy must not be able to corrupt a previously checked sandbox
+# destination while the source snapshot remains intact. Inject both content
+# and mode changes into the first copied file during the second copy.
+mkdir -p "$TMP/mock-cp-sandbox"
+cat > "$TMP/mock-cp-sandbox/cp" <<'MOCK_CP_SANDBOX'
+#!/usr/bin/env bash
+"$REAL_CP" "$@" || exit $?
+dest=${@: -1}
+if [[ $dest == "$MOCK_SANDBOX/etc/systemd/system/disk-watch.service" ]]; then
+  case $MOCK_MUTATION in
+    content) printf 'tampered after first copy\n' > "$MOCK_SANDBOX/usr/local/sbin/disk-watch.sh" ;;
+    mode) chmod 777 -- "$MOCK_SANDBOX/usr/local/sbin/disk-watch.sh" ;;
+  esac
+fi
+MOCK_CP_SANDBOX
+chmod 755 "$TMP/mock-cp-sandbox/cp"
+before_sandbox_mutation=$(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit")
+for mutation in content mode; do
+  sandbox="$TMP/reject-sandbox-$mutation"
+  mkdir -m 700 "$sandbox"
+  if REAL_CP=$(command -v cp) MOCK_SANDBOX="$sandbox" MOCK_MUTATION="$mutation" \
+     PATH="$TMP/mock-cp-sandbox:$PATH" rehearse "$TMP/backups/valid" "$sandbox" > "$TMP/out" 2> "$TMP/err"; then
+    fail "late sandbox $mutation mutation was accepted"
+  fi
+  case $mutation in
+    content) grep -Fq 'sandbox contents changed after copying:' "$TMP/err" ||
+      fail 'missing final sandbox content diagnostic' ;;
+    mode) grep -Fq 'sandbox permissions changed after copying:' "$TMP/err" ||
+      fail 'missing final sandbox permissions diagnostic' ;;
+  esac
+  grep -Fq 'attempted cleanup of partial sandbox files' "$TMP/err" ||
+    fail "late sandbox $mutation mutation did not trigger cleanup"
+  [[ -z $(find "$sandbox" -mindepth 1 -print -quit) ]] ||
+    fail "late sandbox $mutation mutation left partial files"
+done
+[[ $(sha256sum "$TMP/backups/valid$script" "$TMP/backups/valid$unit") == "$before_sandbox_mutation" ]] ||
+  fail 'late sandbox mutation modified the source snapshot'
+rehearse "$TMP/backups/valid" "$TMP/reject-sandbox-content" > "$TMP/out" 2> "$TMP/err" ||
+  fail 'clean sandbox could not be reused after late-mutation cleanup'
+
 # Metadata may change after the initial verification without affecting the
 # per-file cmp/mode checks. Reverify the source at the end and fail closed,
 # cleaning only the disposable sandbox. Never mutate the original fixture.
