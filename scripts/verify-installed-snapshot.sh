@@ -96,16 +96,17 @@ done
 
 hash_count=$(wc -l < "$snapshot/SHA256SUMS") || fail 'cannot read checksums'
 [[ $hash_count -eq $present_count ]] || fail 'extra or missing checksum records'
-# Reject any unlisted non-directory entry, including hidden files, symlinks
-# and special files. Manifests and hashes describe only the fixed allowlist;
-# unexpected payloads must not be mistaken for verified recovery material.
-# GNU find's -exec ... + propagates failures without creating temporary files.
-find "$snapshot" -mindepth 1 ! -type d -exec bash -c '
+# Reject every unlisted entry, including *empty directories*. Previously,
+# an extra empty directory could pass verification because find skipped all
+# directories. Only ancestors of the five fixed recovery paths are allowed.
+# GNU find's -exec ... + propagates failures without temporary files.
+find "$snapshot" -mindepth 1 -exec bash -c '
   root=$1
   shift
   for entry in "$@"; do
     rel=${entry#"$root"/}
     case $rel in
+      usr|usr/local|usr/local/sbin|etc|etc/systemd|etc/systemd/system|\
       .complete|present.txt|absent.txt|SHA256SUMS|format.txt|\
       usr/local/sbin/disk-watch.sh|usr/local/sbin/disk-watch-health.sh|usr/local/sbin/disk-watch-smart.sh|\
       etc/systemd/system/disk-watch.service|etc/systemd/system/disk-watch.timer) ;;

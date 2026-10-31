@@ -24,15 +24,16 @@ mode=$(stat -c '%a' -- "$sandbox") || fail 'cannot read sandbox permissions'
   fail 'sandbox must be empty'
 
 script_dir=$(cd -- "$(dirname -- "$0")" && pwd -P)
-# Verify the entire snapshot before creating even a sandbox subdirectory.
-bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2
-
-# Refuse a sandbox inside its source snapshot, including aliases through
-# symlinked parent directories. Never write rehearsal output into a backup.
+# Refuse a sandbox inside its source snapshot (including parent symlink
+# aliases) before verification. The strict verifier now rejects even empty
+# unlisted directories, so a nested sandbox must be diagnosed separately.
+# No writes occur before either check.
 snapshot_real=$(cd -- "$snapshot" && pwd -P) || fail 'cannot resolve snapshot directory'
 sandbox_real=$(cd -- "$sandbox" && pwd -P) || fail 'cannot resolve sandbox directory'
 [[ $sandbox_real != "$snapshot_real" && $sandbox_real != "$snapshot_real"/* ]] ||
   fail 'sandbox must be outside the snapshot directory'
+# Verify the entire source snapshot before creating any sandbox subdirectory.
+bash "$script_dir/verify-installed-snapshot.sh" "$snapshot" >&2
 
 # Once copying begins, a failure must not leave misleading partial output.
 # Only paths created in this previously empty private sandbox are removed;
