@@ -96,6 +96,18 @@ done
 
 hash_count=$(wc -l < "$snapshot/SHA256SUMS") || fail 'cannot read checksums'
 [[ $hash_count -eq $present_count ]] || fail 'extra or missing checksum records'
+
+# Allowlisted ancestors are directories, not arbitrary entries with an
+# allowlisted name. An all-absent snapshot needs no payload directories, so
+# a regular file or FIFO at e.g. usr/ or etc/systemd/ previously slipped
+# through the name-only find allowlist. Never follow a symlinked ancestor.
+for ancestor in usr usr/local usr/local/sbin etc etc/systemd etc/systemd/system; do
+  entry="$snapshot/$ancestor"
+  if [[ -e $entry || -L $entry ]]; then
+    [[ -d $entry && ! -L $entry ]] ||
+      fail "unsafe recovery directory: $ancestor (expected a real directory)"
+  fi
+done
 # Reject every unlisted entry, including *empty directories*. Previously,
 # an extra empty directory could pass verification because find skipped all
 # directories. Only ancestors of the five fixed recovery paths are allowed.
