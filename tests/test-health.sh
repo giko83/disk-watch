@@ -100,6 +100,14 @@ Serial number:                  To Be Filled By O.E.M.
 SMART Health Status:            OK
 TEXT
  ;;
+separator_placeholder)
+ cat <<'TEXT'
+Device Model:                   USB bridge with separator-only placeholder
+Serial Number:                  00:00-00_00.00
+LU WWN Device Id:               5 000cca 666666666
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 numeric_serial)
  cat <<'TEXT'
 Device Model:                   Drive with real numeric serial
@@ -213,6 +221,11 @@ export SMART_SCENARIO=scsi_no_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$2=="/dev/random" {if ($3!="/dev/random" || $4!="unavailable" || $5!="passed" || $6!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'missing serial should fall back to device path'
 [[ $(wc -l < "$TMP/calls") -eq 5 ]] || fail 'unexpected USB mock probe count'
+# Separator-formatted all-zero serials are placeholders, not stable IDs.
+export SMART_SCENARIO=separator_placeholder
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Restore the scenario for subsequent fixtures.
 # A validated WWN supplies a stable cache ID when the firmware serial is absent.
 # Two /dev paths and WWN label formats must map to the same history identity.
 export SMART_SCENARIO=ata_wwn
