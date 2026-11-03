@@ -221,11 +221,6 @@ export SMART_SCENARIO=scsi_no_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$2=="/dev/random" {if ($3!="/dev/random" || $4!="unavailable" || $5!="passed" || $6!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'missing serial should fall back to device path'
 [[ $(wc -l < "$TMP/calls") -eq 5 ]] || fail 'unexpected USB mock probe count'
-# Separator-formatted all-zero serials are placeholders, not stable IDs.
-export SMART_SCENARIO=separator_placeholder
-bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
-awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
-# Restore the scenario for subsequent fixtures.
 # A validated WWN supplies a stable cache ID when the firmware serial is absent.
 # Two /dev paths and WWN label formats must map to the same history identity.
 export SMART_SCENARIO=ata_wwn
@@ -462,4 +457,9 @@ bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$statu
   fail 'smartctl health-status bit 7 incorrectly rejected usable snapshot'
 grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
   fail 'smartctl high-bit snapshot content missing'
+# Separator-formatted all-zero serials are placeholders, not stable IDs.
+export SMART_SCENARIO=separator_placeholder
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Restore the scenario for subsequent fixtures.
 echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'
