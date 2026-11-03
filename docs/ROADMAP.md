@@ -2,7 +2,9 @@
 
 Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk-watch/issues?q=is%3Aissue). All entries below are **proposals, not implemented features**, until their issues are closed with tested changes and the relevant documentation is updated.
 
-Last curated: 2026-10-31.
+Last curated: 2026-11-03.
+
+**Partial #23 separator-formatted placeholder serials:** serials consisting entirely of zeroes or F characters separated by punctuation/whitespace are rejected as cache IDs, allowing valid WWN fallback. Offline fixture covers an all-zero USB-style serial. No USB bridge capability detection, by-id discovery, never-wake guarantee or hardware validation; #23 remains open.
 
 **Partial #24 final sandbox consistency:** after the last offline restore-rehearsal copy, every copied sandbox file is rechecked for regular-file type, content and mode. Offline mocked later-copy mutation of an earlier destination (bytes or permissions) now fails and cleans only sandbox files, while a clean retry passes. Bash and existing GNU `cmp`/`stat` tools only; no root/systemd/network/hardware, live rollback or race-free guarantee. #24 remains open.
 

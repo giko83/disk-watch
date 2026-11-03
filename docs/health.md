@@ -78,3 +78,7 @@ The history is a root-owned, append-only TSV with permissions `600` (within a pr
 The installer and updater preserve `/etc/disk-watch.conf`, existing kernel cursor state and previous snapshot records. Production deployment is **manual**, one host at a time, with backup/preflight and post-install Telegram checks. See [operations](operations.md).
 
 For non-Linux/unusual smartctl output, parsing is best-effort: if the report cannot be read, it returns an error without saving a new snapshot. Mocks of NVMe, ATA and synthetic SCSI/USB serial-label variants are tested in CI; this is **not** hardware certification, a USB standby-safety probe or a full NVMe JSON parser.
+
+### Placeholder serial formatting (partial #23)
+
+A firmware serial containing only zeroes or only `F` hexadecimal characters, with separators such as `:`, `-`, `_`, `.` or whitespace, is not considered a stable identity. A valid WWN can be used instead; otherwise the explicit device path remains a non-stable fallback. Genuine serials containing other characters are preserved unchanged. This does not probe USB bridge standby support.
