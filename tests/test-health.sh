@@ -224,10 +224,6 @@ bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" -
 awk -F '\t' '$3=="USB-SCSI-0003" {if ($2!="/dev/full" || $4!="unavailable" || $5!="passed" || $6!="unavailable" || $11!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'SCSI/USB serial or unavailable metric parsing wrong'
 bash "$script" history --device USB-SCSI-0003 --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/out") -eq 2 ]] || fail 'SCSI/USB serial history filter failed'
-# Slash-separated zero serials are placeholders, not persistent disk IDs.
-export SMART_SCENARIO=slash_placeholder
-bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
-awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
 # A bridge without a serial must still use the explicit path, never invent an ID.
 export SMART_SCENARIO=scsi_no_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
@@ -473,5 +469,9 @@ grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
 export SMART_SCENARIO=separator_placeholder
 bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Slash-separated zero serials are placeholders, not persistent disk IDs.
+export SMART_SCENARIO=slash_placeholder
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
 # Restore the scenario for subsequent fixtures.
 echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'
