@@ -108,6 +108,14 @@ LU WWN Device Id:               5 000cca 666666666
 SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
+slash_placeholder)
+ cat <<'TEXT'
+Device Model:                   USB bridge with slash-delimited zero serial
+Serial Number:                  00/00/00/00
+LU WWN Device Id:               5 000cca 444444444
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 numeric_serial)
  cat <<'TEXT'
 Device Model:                   Drive with real numeric serial
@@ -216,6 +224,10 @@ bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" -
 awk -F '\t' '$3=="USB-SCSI-0003" {if ($2!="/dev/full" || $4!="unavailable" || $5!="passed" || $6!="unavailable" || $11!="unavailable") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'SCSI/USB serial or unavailable metric parsing wrong'
 bash "$script" history --device USB-SCSI-0003 --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/out") -eq 2 ]] || fail 'SCSI/USB serial history filter failed'
+# Slash-separated zero serials are placeholders, not persistent disk IDs.
+export SMART_SCENARIO=slash_placeholder
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
 # A bridge without a serial must still use the explicit path, never invent an ID.
 export SMART_SCENARIO=scsi_no_serial
 bash "$script" health --device /dev/random --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
