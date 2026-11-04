@@ -174,6 +174,9 @@ if ((refresh)); then
   if [[ -n $serial ]]; then id=$serial
   elif [[ -n $wwn ]]; then id="wwn:$wwn"
   fi
+  if [[ $id == "$device" ]]; then
+    echo "SMART identity warning: no reliable serial/WWN; device-path ID may change after reboot ($device)" >&2
+  fi
   health=unavailable
   if grep -Eq 'SMART overall-health self-assessment test result:[[:space:]]*PASSED|SMART Health Status:[[:space:]]*OK' <<<"$raw"; then health=passed
   elif grep -Eiq 'SMART overall-health self-assessment test result:[[:space:]]*FAILED|SMART Health Status:[[:space:]]*(FAILED|BAD)' <<<"$raw"; then health=failed
