@@ -1,5 +1,7 @@
 # Disk Watch
 
+**Path fallback (#23 partial):** Explicit SMART refresh warns when no reliable serial/WWN exists and the saved ID uses a potentially volatile device path. No extra probing or standby guarantee.
+
 A minimal Linux disk monitoring tool for Debian and Proxmox VE, with Telegram alerts.
 
 - **Kernel storage errors** are detected from the system journal every minute.
