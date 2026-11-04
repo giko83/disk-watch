@@ -476,7 +476,43 @@ grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
 # Refuse /dev path traversal and ambiguous components before any SMART access.
 # Valid nested /dev/disk/by-id paths remain allowed by the lexical guard.
 probes_before=$(wc -l < "$TMP/calls")
-for invalid_device in /dev/../tmp/fake /dev/./sda /dev//sda /dev/disk/../../etc/passwd /dev/sda/..; do
+for invalid_device in /dev/../tmp/fake /dev/./sda /dev//sda /dev/disk/../../etc/passwd /dev/sda/.. /dev/ /dev/sda/ 
+  if bash "$script" health --device "$invalid_device" --refresh --wake-ok --state-dir "$TMP/rejected-paths" > "$TMP/out" 2>&1; then
+    fail "unsafe device path accepted: $invalid_device"
+  fi
+  grep -Fq 'Explicit /dev/... path required' "$TMP/out" || fail "missing unsafe device path diagnostic"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe device path triggered SMART access'
+[[ ! -e "$TMP/rejected-paths/health/snapshots.tsv" ]] || fail 'unsafe device path created snapshot'
+# Separator-formatted all-zero serials are placeholders, not stable IDs.
+export SMART_SCENARIO=separator_placeholder
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Slash-separated zero serials are placeholders, not persistent disk IDs.
+export SMART_SCENARIO=slash_placeholder
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
+# Restore the scenario for subsequent fixtures.
+echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'
+/dev/sda\r' 
+  if bash "$script" health --device "$invalid_device" --refresh --wake-ok --state-dir "$TMP/rejected-paths" > "$TMP/out" 2>&1; then
+    fail "unsafe device path accepted: $invalid_device"
+  fi
+  grep -Fq 'Explicit /dev/... path required' "$TMP/out" || fail "missing unsafe device path diagnostic"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe device path triggered SMART access'
+[[ ! -e "$TMP/rejected-paths/health/snapshots.tsv" ]] || fail 'unsafe device path created snapshot'
+# Separator-formatted all-zero serials are placeholders, not stable IDs.
+export SMART_SCENARIO=separator_placeholder
+bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Slash-separated zero serials are placeholders, not persistent disk IDs.
+export SMART_SCENARIO=slash_placeholder
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
+# Restore the scenario for subsequent fixtures.
+echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'
+/dev/sda\033[31m'; do
   if bash "$script" health --device "$invalid_device" --refresh --wake-ok --state-dir "$TMP/rejected-paths" > "$TMP/out" 2>&1; then
     fail "unsafe device path accepted: $invalid_device"
   fi
