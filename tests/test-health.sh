@@ -184,6 +184,14 @@ bash "$script" history --device NVME-TEST-0001 --state-dir "$st" >/dev/null
 if bash "$script" health --device /dev/null --refresh --state-dir "$st" >"$TMP/output" 2>&1; then fail 'SMART refresh accepted without wake-ok'; fi
 if bash "$script" health --device /dev/null --wake-ok --state-dir "$st" >"$TMP/output" 2>&1; then fail 'SMART wake-ok accepted without refresh'; fi
 [[ ! -e "$TMP/calls" ]] || fail 'unsafe option path invoked smartctl'
+# Volatile identity fallback must be explicit, without extra device probes.
+export SMART_SCENARIO=scsi_no_serial
+bash "$script" health --device /dev/identity-fallback --refresh --wake-ok --state-dir "$st" > "$TMP/out" 2>"$TMP/identity-warning"
+grep -Fq 'SMART identity warning: no reliable serial/WWN' "$TMP/identity-warning" || fail 'missing volatile identity warning'
+grep -Fq '/dev/identity-fallback' "$TMP/identity-warning" || fail 'missing fallback path in warning'
+rm -rf -- "$st"
+: > "$TMP/calls"
+export SMART_SCENARIO=nvme
 # Mock NVMe test with SMART failing exit bits despite useful data.
 bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/calls") -eq 1 ]] || fail 'expected one explicit SMART invocation'

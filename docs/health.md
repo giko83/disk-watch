@@ -1,5 +1,7 @@
 # Cached disk health and inventory
 
+**Path fallback warning (#23 partial):** When no reliable serial or WWN is available, an explicitly authorized refresh warns on stderr that the saved device-path ID may change across reboots. This does not provide USB/SAT capability detection or historical ID migration.
+
 Disk Watch now has **read-only, non-waking** health reports. No database, Python, web UI, daemon, or mandatory `smartctl` is needed to *read saved data*.
 
 ## Commands
