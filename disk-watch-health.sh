@@ -66,7 +66,8 @@ clean() {
  printf '%s' "${v:0:180}"
 }
 if ((refresh)); then
-  # Do not allow traversal or ambiguous slash components to escape /dev/\n  # when an explicitly authorized SMART probe is executed as root.\n  [[ $device == /dev/* && $device != *
+  # Reject dot/dot-dot traversal and ambiguous repeated slashes before SMART access.
+  [[ $device == /dev/* && $device != *
     echo 'Explicit /dev/... path required' >&2; exit 2;
   }
   # Refuse unsafe cache paths before touching a disk. A symlinked lock file
@@ -562,7 +563,8 @@ case $action in
    awk -F '\t' -v date="$since" 'NR>1 && NF>=13 && (date=="" || substr($1,1,10)>=date) {print}' "$db" | format_rows
    ;;
 esac
-\t'* &&\n     $device != *'//'* && ! $device =~ (^|/)\.\.?(/|$) ]] || {
+\t'* &&
+     $device != *'//'* && ! $device =~ (^|/)\.\.?(/|$) ]] || {
     echo 'Explicit /dev/... path required' >&2; exit 2;
   }
   # Refuse unsafe cache paths before touching a disk. A symlinked lock file
