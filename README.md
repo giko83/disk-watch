@@ -1,5 +1,8 @@
 # Disk Watch
 
+**#24 proposed rollback (unreleased):** installer error handling can attempt to restore five installed files from a verified format-2 snapshot and recover timer state. This is not yet validated on real systemd hosts or deployed; manual recovery remains necessary if rollback itself fails.
+
+
 **Explicit SMART device paths (#23 partial):** `health --refresh --wake-ok --device` rejects `/dev/` paths with `.` or `..` components or doubled slashes before probing. This is lexical validation, not device identity verification or a USB standby guarantee.
 
 **Path fallback (#23 partial):** Explicit SMART refresh warns when no reliable serial/WWN exists and the saved ID uses a potentially volatile device path. No extra probing or standby guarantee.
