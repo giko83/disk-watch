@@ -1,5 +1,7 @@
 # Disk Watch — roadmap and feature backlog
 
+**Partial #23 path safety:** Explicit SMART refresh rejects `/dev/` traversal (`.`/`..`) and repeated-slash components before calling smartctl. Offline mock verifies no probe or snapshot for malformed paths. No canonical block-device validation, USB bridge capability discovery or never-wake guarantee; #23 stays open.
+
 **Partial #23 volatile-ID diagnostic:** Explicit SMART refresh warns if no reliable serial/WWN exists and the snapshot ID falls back to a device path. Offline fixture verifies warning; no extra probes, by-id discovery, USB standby detection or deployment. #23 remains open.
 
 Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk-watch/issues?q=is%3Aissue). All entries below are **proposals, not implemented features**, until their issues are closed with tested changes and the relevant documentation is updated.
