@@ -1,5 +1,7 @@
 # Disk Watch — roadmap and feature backlog
 
+**Partial #23 volatile-ID diagnostic:** Explicit SMART refresh warns if no reliable serial/WWN exists and the snapshot ID falls back to a device path. Offline fixture verifies warning; no extra probes, by-id discovery, USB standby detection or deployment. #23 remains open.
+
 Source of truth for planned work: [GitHub Issues](https://github.com/giko83/disk-watch/issues?q=is%3Aissue). All entries below are **proposals, not implemented features**, until their issues are closed with tested changes and the relevant documentation is updated.
 
 Last curated: 2026-11-03.
