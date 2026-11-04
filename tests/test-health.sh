@@ -191,6 +191,7 @@ grep -Fq 'SMART identity warning: no reliable serial/WWN' "$TMP/identity-warning
 grep -Fq '/dev/identity-fallback' "$TMP/identity-warning" || fail 'missing fallback path in warning'
 rm -rf -- "$st"
 : > "$TMP/calls"
+export SMART_SCENARIO=nvme
 # Mock NVMe test with SMART failing exit bits despite useful data.
 bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 [[ $(wc -l < "$TMP/calls") -eq 1 ]] || fail 'expected one explicit SMART invocation'
