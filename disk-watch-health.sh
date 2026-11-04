@@ -165,7 +165,7 @@ if ((refresh)); then
   # Preserve a firmware serial as the cached ID instead of the volatile /dev path.
   # Generic placeholder serials (including zero-only, all-F and OEM filler strings)
   # are not unique; use WWN or the explicit device path instead.
-  serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); s=tolower($2); compact=s; gsub(/[-:._[:space:]]/, "", compact); if (s=="unknown" || s=="unavailable" || s=="none" || s=="n/a" || s=="not available" || s=="not specified" || s=="to be filled by o.e.m." || compact ~ /^0+$/ || compact ~ /^f+$/) exit; print $2; exit}' <<<"$raw")
+  serial=$(awk -F: 'tolower($1) ~ /^[[:space:]]*serial[[:space:]]+number[[:space:]]*$/ {sub(/^[[:space:]]+/, "", $2); sub(/[[:space:]]+$/, "", $2); s=tolower($2); compact=s; gsub(/[-:._\/[:space:]]/, "", compact); if (s=="unknown" || s=="unavailable" || s=="none" || s=="n/a" || s=="not available" || s=="not specified" || s=="to be filled by o.e.m." || compact ~ /^0+$/ || compact ~ /^f+$/) exit; print $2; exit}' <<<"$raw")
   # Some ATA/SCSI reports expose a WWN but no serial. Accept only a full
   # 16-hex-digit identifier excluding all-zero/all-F sentinels; never invent one from a /dev path.
   # Keep serial precedence to preserve existing snapshot IDs.

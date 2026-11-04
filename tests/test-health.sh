@@ -108,6 +108,14 @@ LU WWN Device Id:               5 000cca 666666666
 SMART overall-health self-assessment test result: PASSED
 TEXT
  ;;
+slash_placeholder)
+ cat <<'TEXT'
+Device Model:                   USB bridge with slash-delimited zero serial
+Serial Number:                  00/00/00/00
+LU WWN Device Id:               5 000cca 444444444
+SMART overall-health self-assessment test result: PASSED
+TEXT
+ ;;
 numeric_serial)
  cat <<'TEXT'
 Device Model:                   Drive with real numeric serial
@@ -461,5 +469,9 @@ grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
 export SMART_SCENARIO=separator_placeholder
 bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
 awk -F '\t' '$4=="USB bridge with separator-only placeholder" {if ($3!="wwn:5000cca666666666") exit 1; found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'separator-only zero serial should defer to WWN'
+# Slash-separated zero serials are placeholders, not persistent disk IDs.
+export SMART_SCENARIO=slash_placeholder
+bash "$script" health --device /dev/full --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
+awk -F '\t' '$3=="wwn:5000cca444444444" {found=1} END {if (!found) exit 1}' "$TMP/out" || fail 'slash-delimited zero serial was accepted as stable ID'
 # Restore the scenario for subsequent fixtures.
 echo 'PASS: offline cached health, explicit wake guard, SMART exit-bitmask acquisition errors, NVMe/ATA and SCSI/USB identity, history, filters, storage and row validation'

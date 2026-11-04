@@ -214,3 +214,5 @@ Contributions should include offline tests and update the relevant README, examp
 - Disk Watch does not check actual storage SMART values without `smartd`, nor does it perform surface scans.
 
 MIT licensed. Contributions welcome.
+
+SMART ID safety: slash-delimited zero-only/all-F serial placeholders (for example `00/00/00`) are ignored in favor of a valid WWN during explicit opt-in refresh. This is not USB standby capability detection; `--wake-ok` may spin up disks.
