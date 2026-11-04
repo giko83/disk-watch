@@ -67,8 +67,8 @@ clean() {
 }
 if ((refresh)); then
   # Reject dot/dot-dot traversal and ambiguous repeated slashes before SMART access.
-  [[ $device == /dev/* && $device != *$'\n'* && $device != *$'\t'* &&
-     $device != *'//'* && ! $device =~ (^|/)\.\.?(/|$) ]] || {
+  [[ $device == /dev/?* && $device != */ && $device != *'//'* &&
+     ! $device =~ [[:cntrl:]] && ! $device =~ (^|/)\.\.?(/|$) ]] || {
     echo 'Explicit /dev/... path required' >&2; exit 2;
   }
   # Refuse unsafe cache paths before touching a disk. A symlinked lock file
