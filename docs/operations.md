@@ -2,6 +2,10 @@
 
 This document is for maintainers deploying Disk Watch to existing Debian or Proxmox hosts. **No automatic deployment is configured.** Treat a GitHub pull request as proposed code, not a production release.
 
+## Transactional rollback candidate (#24, not released)
+
+The proposed installer uses a verified format-2 snapshot to restore the five allowlisted scripts and units after a failed install command, then reloads systemd and attempts to recover timer enablement and activity. Run `bash tests/test-restore-installed.sh` offline; do not run the live restore helper on production without an independent recovery plan. Failed rollback still requires manual intervention. Real root/systemd behavior, race resistance and CI remain unverified.
+
 ## Before the first Git-based deployment
 
 On each host, one at a time:
