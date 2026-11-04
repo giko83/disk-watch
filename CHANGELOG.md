@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Warn when an explicit SMART snapshot uses a potentially volatile device-path ID because no reliable serial/WWN exists (#23 partial). Offline fixture; no new probes or deployment.
 - Reject slash-delimited zero-only/all-F SMART serial placeholders in opt-in snapshot IDs; prefer valid WWN, with offline regression (#23 partial). No USB standby capability claim or deployment.
 - Ignore punctuation-separated all-zero/all-F firmware serial placeholders when choosing SMART snapshot IDs (#23 partial); preserve genuine serials and prefer valid WWN fallback. Offline mock regression; no live USB/standby probing or deployment.
 - Reject symlinked ancestors of the offline restore rehearsal **sandbox** path (#24 partial), including parent aliases and trailing-slash leaf symlinks, before copying. Offline regressions verify explicit refusal, unchanged recovery bytes, an untouched aliased destination and normal private sandbox compatibility. Bash only for the guard; existing GNU utilities remain required for the rehearsal. No root, systemd, deployment or live rollback; best-effort against filesystem races and #24 remains open.
