@@ -1,5 +1,7 @@
 # Disk Watch — roadmap and feature backlog
 
+**#24 candidate in review:** a five-path format-2 restore helper, ERR-triggered installer rollback and offline sandbox regression have been added to a development branch. CI and live root/systemd rollback remain unverified. Do not close #24 or deploy until the full acceptance criteria are met.
+
 **Partial #23 path safety:** Explicit SMART refresh rejects `/dev/` traversal (`.`/`..`) and repeated-slash components before calling smartctl. Offline mock verifies no probe or snapshot for malformed paths. No canonical block-device validation, USB bridge capability discovery or never-wake guarantee; #23 stays open.
 
 **Partial #23 volatile-ID diagnostic:** Explicit SMART refresh warns if no reliable serial/WWN exists and the snapshot ID falls back to a device path. Offline fixture verifies warning; no extra probes, by-id discovery, USB standby detection or deployment. #23 remains open.
