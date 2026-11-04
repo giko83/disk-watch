@@ -1,6 +1,6 @@
 # Disk Watch
 
-**Explicit SMART device paths (#23 partial):** `health --refresh --wake-ok --device` rejects `/dev/` paths with `.` or `..` components or doubled slashes before probing. This is lexical validation, not device identity verification or a USB standby guarantee.
+**Explicit SMART device paths (#23 partial):** `health --refresh --wake-ok --device` rejects `/dev/` paths with `.` or `..` components or doubled slashes, trailing slashes and ASCII control characters before probing. This is lexical validation, not device identity verification or a USB standby guarantee.
 
 **Path fallback (#23 partial):** Explicit SMART refresh warns when no reliable serial/WWN exists and the saved ID uses a potentially volatile device path. No extra probing or standby guarantee.
 
