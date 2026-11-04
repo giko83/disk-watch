@@ -66,7 +66,9 @@ clean() {
  printf '%s' "${v:0:180}"
 }
 if ((refresh)); then
-  [[ $device == /dev/* && $device != *$'\n'* && $device != *$'\t'* ]] || {
+  # Reject dot/dot-dot traversal and ambiguous repeated slashes before SMART access.
+  [[ $device == /dev/* && $device != *$'\n'* && $device != *$'\t'* &&
+     $device != *'//'* && ! $device =~ (^|/)\.\.?(/|$) ]] || {
     echo 'Explicit /dev/... path required' >&2; exit 2;
   }
   # Refuse unsafe cache paths before touching a disk. A symlinked lock file
