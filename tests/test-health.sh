@@ -473,6 +473,17 @@ bash "$script" health --device /dev/null --refresh --wake-ok --state-dir "$statu
   fail 'smartctl health-status bit 7 incorrectly rejected usable snapshot'
 grep -Fq 'STATUS-TEST-0004' "$TMP/out" ||
   fail 'smartctl high-bit snapshot content missing'
+# Refuse /dev path traversal and ambiguous components before any SMART access.
+# Valid nested /dev/disk/by-id paths remain allowed by the lexical guard.
+probes_before=$(wc -l < "$TMP/calls")
+for invalid_device in /dev/../tmp/fake /dev/./sda /dev//sda /dev/disk/../../etc/passwd /dev/sda/..; do
+  if bash "$script" health --device "$invalid_device" --refresh --wake-ok --state-dir "$TMP/rejected-paths" > "$TMP/out" 2>&1; then
+    fail "unsafe device path accepted: $invalid_device"
+  fi
+  grep -Fq 'Explicit /dev/... path required' "$TMP/out" || fail "missing unsafe device path diagnostic"
+done
+[[ $(wc -l < "$TMP/calls") -eq "$probes_before" ]] || fail 'unsafe device path triggered SMART access'
+[[ ! -e "$TMP/rejected-paths/health/snapshots.tsv" ]] || fail 'unsafe device path created snapshot'
 # Separator-formatted all-zero serials are placeholders, not stable IDs.
 export SMART_SCENARIO=separator_placeholder
 bash "$script" health --device /dev/zero --refresh --wake-ok --state-dir "$st" --format tsv > "$TMP/out"
