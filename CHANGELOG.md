@@ -5,6 +5,7 @@ All notable changes to Disk Watch are documented here. Entries under **Unrelease
 ## Unreleased
 
 ### Added
+- Refuse dot/dot-dot traversal and doubled-slash components in explicit SMART `/dev/` paths before probing, with offline no-probe regressions (#23 partial). No hardware or standby guarantee.
 - Warn when an explicit SMART snapshot uses a potentially volatile device-path ID because no reliable serial/WWN exists (#23 partial). Offline fixture; no new probes or deployment.
 - Reject slash-delimited zero-only/all-F SMART serial placeholders in opt-in snapshot IDs; prefer valid WWN, with offline regression (#23 partial). No USB standby capability claim or deployment.
 - Ignore punctuation-separated all-zero/all-F firmware serial placeholders when choosing SMART snapshot IDs (#23 partial); preserve genuine serials and prefer valid WWN fallback. Offline mock regression; no live USB/standby probing or deployment.
