@@ -37,6 +37,9 @@ if bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >/dev
 fi
 [[ $(cat "$tmp/target/etc/disk-watch.conf") == secret && $(cat "$tmp/target/kernel.cursor") == cursor ]] || exit 1
 
+# Repair the deliberately corrupted snapshot before testing destination safety.\nprintf 'old:%s\n' '/usr/local/sbin/disk-watch.sh' > "$tmp/snapshot/usr/local/sbin/disk-watch.sh"
+bash "$repo/scripts/verify-installed-snapshot.sh" "$tmp/snapshot" >/dev/null
+
 # Refuse a symlink destination before changing ANY allowlisted file.
 printf 'sentinel\\n' > "$tmp/external"
 rm -- "$tmp/target/etc/systemd/system/disk-watch.timer"
