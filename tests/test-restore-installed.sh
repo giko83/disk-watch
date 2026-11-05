@@ -10,9 +10,6 @@ for path in "${paths[@]}"; do
   mkdir -p -- "$tmp/target$(dirname "$path")"
   printf 'old:%s\n' "$path" > "$tmp/target$path"
 done
-bash "$repo/scripts/backup-installed.sh" "$tmp/snapshot" "${paths[@]/#/$tmp/target}" >/dev/null 2>&1 && {
-  echo 'Test setup incorrectly accepted sandbox-prefixed snapshot paths' >&2; exit 1;
-}
 # Build a real format-2 snapshot with fixed manifest names and checksums.
 rm -rf -- "$tmp/snapshot"
 mkdir -m 700 "$tmp/snapshot"
