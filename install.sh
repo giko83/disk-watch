@@ -22,7 +22,7 @@ preflight() {
     echo "Preflight failed: unsafe scripts directory (symlink or non-directory)" >&2
     return 1
   }
-  for file in install.sh disk-watch.sh disk-watch-health.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh; do
+  for file in install.sh disk-watch.sh disk-watch-health.sh disk-watch-smart.sh update.sh disk-watch.service disk-watch.timer scripts/backup-installed.sh scripts/check-config.sh scripts/verify-installed-snapshot.sh scripts/plan-installed-restore.sh scripts/rehearse-installed-restore.sh scripts/restore-installed.sh; do
     [[ -s "$file" ]] || { echo "Preflight failed: missing or empty $file" >&2; return 1; }
     [[ -f "$file" && ! -L "$file" ]] || {
       echo "Preflight failed: unsafe source file (symlink or non-regular): $file" >&2
@@ -43,7 +43,7 @@ preflight() {
 
   (bash -n disk-watch.sh && bash -n disk-watch-health.sh && bash -n install.sh && bash -n update.sh && bash -n scripts/backup-installed.sh && bash -n scripts/check-config.sh &&
    bash -n scripts/verify-installed-snapshot.sh && bash -n scripts/plan-installed-restore.sh &&
-   bash -n scripts/rehearse-installed-restore.sh) || {
+   bash -n scripts/rehearse-installed-restore.sh && bash -n scripts/restore-installed.sh) || {
     echo 'Preflight failed: invalid Bash syntax' >&2
     return 1
   }
@@ -54,7 +54,7 @@ preflight() {
 
   # Core runtime and deployment tools only. curl/sendmail/smartctl are optional
   # and depend on the selected notification and SMART integrations.
-  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat sha256sum awk sort find cat; do
+  for cmd in bash sh install systemctl journalctl flock grep sed tail cut wc mv mkdir chmod hostname cp mktemp dirname date stat sha256sum awk sort find cat cmp rm; do
     command -v "$cmd" >/dev/null 2>&1 || {
       echo "Preflight failed: required command not found: $cmd" >&2
       return 1
@@ -131,6 +131,34 @@ if ! bash ./scripts/verify-installed-snapshot.sh "$backup_dir"; then
 fi
 echo "Pre-install snapshot verified: $backup_dir"
 
+# Preserve pre-update timer state; on failure restore files and the prior
+# timer enablement/activity. Rollback failure is fatal and requires manual review.
+timer_enabled=$(systemctl is-enabled disk-watch.timer 2>/dev/null || true)
+timer_active=$(systemctl is-active disk-watch.timer 2>/dev/null || true)
+rollback_on_error() {
+  local status=$?
+  trap - ERR
+  echo "Installation failed (status $status); restoring snapshot $backup_dir" >&2
+  if ! bash ./scripts/restore-installed.sh "$backup_dir" /; then
+    echo "CRITICAL: file rollback failed; manual recovery required: $backup_dir" >&2
+    exit 1
+  fi
+  if ! systemctl daemon-reload; then
+    echo 'CRITICAL: rollback daemon-reload failed; manual recovery required' >&2
+    exit 1
+  fi
+  case $timer_enabled in
+    enabled|enabled-runtime) systemctl enable disk-watch.timer || exit 1 ;;
+    *) systemctl disable disk-watch.timer || exit 1 ;;
+  esac
+  case $timer_active in
+    active) systemctl start disk-watch.timer || exit 1 ;;
+    *) systemctl stop disk-watch.timer || exit 1 ;;
+  esac
+  echo 'Rollback applied; inspect service and timer before retrying.' >&2
+  exit "$status"
+}
+trap rollback_on_error ERR
 install -m 750 disk-watch.sh disk-watch-health.sh disk-watch-smart.sh /usr/local/sbin/
 install -m 644 disk-watch.service disk-watch.timer /etc/systemd/system/
 systemctl daemon-reload
@@ -138,5 +166,6 @@ if [[ ! -s /var/lib/disk-watch/kernel.cursor ]]; then
   /usr/local/sbin/disk-watch.sh init
 fi
 systemctl enable --now disk-watch.timer
+trap - ERR
 echo 'Installed. Check: systemctl list-timers disk-watch.timer'
 echo 'SMART integration remains configured separately in /etc/smartd.conf.'

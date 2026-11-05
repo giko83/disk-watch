@@ -15,7 +15,7 @@ awk '
 ' "$ROOT/install.sh" || { echo 'FAIL: missing pre-deployment snapshot verification gate' >&2; exit 1; }
 # The now-mandatory verifier uses GNU find and cat. Keep both in preflight
 # so a missing tool cannot cause a failure only after a backup is created.
-grep -Fq 'awk sort find cat; do' "$ROOT/install.sh" ||
+grep -Fq 'awk sort find cat cmp rm; do' "$ROOT/install.sh" ||
   { echo 'FAIL: installer preflight omits snapshot-verifier prerequisites' >&2; exit 1; }
 # Guard against omitting a deployed executable from the pre-install snapshot.
 grep -Fq '/usr/local/sbin/disk-watch-health.sh \' "$ROOT/install.sh" ||
@@ -30,7 +30,7 @@ cp "$ROOT/install.sh" "$ROOT/update.sh" "$ROOT/disk-watch.sh" "$ROOT/disk-watch-
 mkdir -p "$TMP/source/scripts"
 cp "$ROOT/scripts/backup-installed.sh" "$ROOT/scripts/check-config.sh" \
    "$ROOT/scripts/verify-installed-snapshot.sh" "$ROOT/scripts/plan-installed-restore.sh" \
-   "$ROOT/scripts/rehearse-installed-restore.sh" "$TMP/source/scripts/"
+   "$ROOT/scripts/rehearse-installed-restore.sh" "$ROOT/scripts/restore-installed.sh" "$TMP/source/scripts/"
 
 # If the preflight ever calls systemctl rather than just checking availability,
 # the mock leaves a detectable marker and fails.
@@ -143,7 +143,7 @@ cp "$ROOT/scripts/backup-installed.sh" "$TMP/source/scripts/backup-installed.sh"
 
 # Recovery helpers are not installed on hosts, but must remain usable from
 # the checkout before an update that may require manual restoration.
-for helper in verify-installed-snapshot.sh plan-installed-restore.sh rehearse-installed-restore.sh; do
+for helper in verify-installed-snapshot.sh plan-installed-restore.sh rehearse-installed-restore.sh restore-installed.sh; do
   mv "$TMP/source/scripts/$helper" "$TMP/missing-$helper"
   if bash "$TMP/source/install.sh" --preflight > "$TMP/out" 2> "$TMP/err"; then
     fail "missing recovery helper $helper passed preflight"
