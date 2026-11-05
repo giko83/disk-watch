@@ -84,7 +84,7 @@ count_file=${DISK_WATCH_INSTALL_COUNT:?}
 count=0
 [[ ! -f $count_file ]] || read -r count < "$count_file"
 count=$((count + 1))
-printf '%s\\n' "$count" > "$count_file"
+printf '%s\n' "$count" > "$count_file"
 if (( count == 2 )); then
   echo 'injected second-copy failure' >&2
   exit 71
@@ -94,9 +94,9 @@ FAKE_INSTALL
 chmod 700 "$tmp/fakebin/install"
 for path in "${paths[@]}"; do
   mkdir -p -- "$tmp/target$(dirname "$path")"
-  printf 'new-failure-case\\n' > "$tmp/target$path"
+  printf 'new-failure-case\n' > "$tmp/target$path"
 done
-if DISK_WATCH_INSTALL_COUNT="$tmp/install-count" PATH="$tmp/fakebin:$PATH" \\
+if DISK_WATCH_INSTALL_COUNT="$tmp/install-count" PATH="$tmp/fakebin:$PATH" \
   bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >"$tmp/failure.out" 2>&1; then
   echo 'Injected partial restore failure was accepted' >&2; exit 1
 fi
