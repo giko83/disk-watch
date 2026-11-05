@@ -73,4 +73,46 @@ bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >/dev/nu
 [[ $(cat "$tmp/target/etc/disk-watch.conf") == secret && $(cat "$tmp/target/kernel.cursor") == cursor ]] || {
   echo 'Config or state changed during absent-file restore' >&2; exit 1;
 }
-echo 'PASS: sandbox restore, corrupt snapshot refusal, unsafe destination precheck, absent-file rollback and state preservation'
+# Inject a failure after one successful restore copy. The helper must report failure,
+# never touch config/state, and leave a verified snapshot for a manual retry.
+# This deliberately documents that the five-file restore is NOT atomic.
+mkdir -p "$tmp/fakebin"
+cat > "$tmp/fakebin/install" <<'FAKE_INSTALL'
+#!/usr/bin/env bash
+set -euo pipefail
+count_file=${DISK_WATCH_INSTALL_COUNT:?}
+count=0
+[[ ! -f $count_file ]] || read -r count < "$count_file"
+count=$((count + 1))
+printf '%s\\n' "$count" > "$count_file"
+if (( count == 2 )); then
+  echo 'injected second-copy failure' >&2
+  exit 71
+fi
+exec /usr/bin/install "$@"
+FAKE_INSTALL
+chmod 700 "$tmp/fakebin/install"
+for path in "${paths[@]}"; do
+  mkdir -p -- "$tmp/target$(dirname "$path")"
+  printf 'new-failure-case\\n' > "$tmp/target$path"
+done
+if DISK_WATCH_INSTALL_COUNT="$tmp/install-count" PATH="$tmp/fakebin:$PATH" \\
+  bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >"$tmp/failure.out" 2>&1; then
+  echo 'Injected partial restore failure was accepted' >&2; exit 1
+fi
+[[ $(cat "$tmp/install-count") == 2 ]] || { echo 'Failure injection did not reach second copy' >&2; exit 1; }
+[[ $(cat "$tmp/target/usr/local/sbin/disk-watch.sh") == old:/usr/local/sbin/disk-watch.sh ]] || exit 1
+[[ $(cat "$tmp/target/usr/local/sbin/disk-watch-health.sh") == new-failure-case ]] || exit 1
+[[ $(cat "$tmp/target/etc/disk-watch.conf") == secret && $(cat "$tmp/target/kernel.cursor") == cursor ]] || exit 1
+bash "$repo/scripts/verify-installed-snapshot.sh" "$tmp/snapshot" >/dev/null
+# A normal retry must recover all present paths and remove the absent timer.
+bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >/dev/null
+for path in "${paths[@]}"; do
+  if [[ $path == "$absent" ]]; then
+    [[ ! -e "$tmp/target$path" ]] || exit 1
+  else
+    cmp -s -- "$tmp/snapshot$path" "$tmp/target$path" || exit 1
+  fi
+done
+[[ $(cat "$tmp/target/etc/disk-watch.conf") == secret && $(cat "$tmp/target/kernel.cursor") == cursor ]] || exit 1
+echo 'PASS: sandbox restore, corrupt snapshot refusal, unsafe destination precheck, absent-file rollback and state preservation, injected partial restore failure and successful retry'
