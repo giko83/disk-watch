@@ -37,14 +37,15 @@ if bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >/dev
 fi
 [[ $(cat "$tmp/target/etc/disk-watch.conf") == secret && $(cat "$tmp/target/kernel.cursor") == cursor ]] || exit 1
 
-# Repair the deliberately corrupted snapshot before testing destination safety.\nprintf 'old:%s\n' '/usr/local/sbin/disk-watch.sh' > "$tmp/snapshot/usr/local/sbin/disk-watch.sh"
+# Repair the deliberately corrupted snapshot before testing destination safety.
+printf 'old:%s\n' '/usr/local/sbin/disk-watch.sh' > "$tmp/snapshot/usr/local/sbin/disk-watch.sh"
 bash "$repo/scripts/verify-installed-snapshot.sh" "$tmp/snapshot" >/dev/null
 
 # Refuse a symlink destination before changing ANY allowlisted file.
-printf 'sentinel\\n' > "$tmp/external"
+printf 'sentinel\n' > "$tmp/external"
 rm -- "$tmp/target/etc/systemd/system/disk-watch.timer"
 ln -s "$tmp/external" "$tmp/target/etc/systemd/system/disk-watch.timer"
-printf 'unchanged\\n' > "$tmp/target/usr/local/sbin/disk-watch.sh"
+printf 'unchanged\n' > "$tmp/target/usr/local/sbin/disk-watch.sh"
 if bash "$repo/scripts/restore-installed.sh" "$tmp/snapshot" "$tmp/target" >/dev/null 2>&1; then
   echo 'Symlinked destination accepted' >&2; exit 1
 fi
@@ -52,7 +53,7 @@ fi
   echo 'Unsafe destination check mutated files' >&2; exit 1;
 }
 rm -- "$tmp/target/etc/systemd/system/disk-watch.timer"
-printf 'new\\n' > "$tmp/target/etc/systemd/system/disk-watch.timer"
+printf 'new\n' > "$tmp/target/etc/systemd/system/disk-watch.timer"
 
 # A snapshot marking the timer as previously absent must REMOVE a newly installed timer.
 # Rebuild a complete, independently verified format-2 manifest for that case.
@@ -60,7 +61,7 @@ absent=/etc/systemd/system/disk-watch.timer
 rm -- "$tmp/snapshot$absent"
 grep -Fxv -- "$absent" "$tmp/snapshot/present.txt" > "$tmp/present.new"
 mv -- "$tmp/present.new" "$tmp/snapshot/present.txt"
-printf '%s\\n' "$absent" >> "$tmp/snapshot/absent.txt"
+printf '%s\n' "$absent" >> "$tmp/snapshot/absent.txt"
 grep -Fv -- ".$absent" "$tmp/snapshot/SHA256SUMS" > "$tmp/sums.new"
 mv -- "$tmp/sums.new" "$tmp/snapshot/SHA256SUMS"
 bash "$repo/scripts/verify-installed-snapshot.sh" "$tmp/snapshot" >/dev/null
